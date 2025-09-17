@@ -18,6 +18,11 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
       id: 'users',
       name: 'Gestión de Usuarios',
       icon: '👥'
+    },
+    {
+      id: 'payments',
+      name: 'Gestión Pasarela Pagos',
+      icon: '💳'
     }
   ]
 

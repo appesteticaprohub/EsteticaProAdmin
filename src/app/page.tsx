@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Sidebar from '@/components/Sidebar'
 import DashboardStats from '@/components/DashboardStats'
 import UserManagement from '@/components/UserManagement'
+import PaymentGatewayManagement from '@/components/PaymentGatewayManagement'
 
 export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState('dashboard')
@@ -14,6 +15,8 @@ export default function AdminDashboard() {
         return <DashboardStats />
       case 'users':
         return <UserManagement />
+      case 'payments':
+        return <PaymentGatewayManagement />
       default:
         return <DashboardStats />
     }
