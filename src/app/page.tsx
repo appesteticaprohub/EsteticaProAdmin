@@ -5,6 +5,7 @@ import Sidebar from '@/components/Sidebar'
 import DashboardStats from '@/components/DashboardStats'
 import UserManagement from '@/components/UserManagement'
 import PaymentGatewayManagement from '@/components/PaymentGatewayManagement'
+import PriceManagement from '@/components/PriceManagement'
 
 export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState('dashboard')
@@ -17,6 +18,8 @@ export default function AdminDashboard() {
         return <UserManagement />
       case 'payments':
         return <PaymentGatewayManagement />
+      case 'prices':
+        return <PriceManagement />
       default:
         return <DashboardStats />
     }

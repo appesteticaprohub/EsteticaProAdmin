@@ -23,6 +23,11 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
       id: 'payments',
       name: 'Gestión Pasarela Pagos',
       icon: '💳'
+    },
+    {
+      id: 'prices',
+      name: 'Gestión Precios',
+      icon: '💰'
     }
   ]
 
