@@ -6,6 +6,11 @@ import DashboardStats from '@/components/DashboardStats'
 import UserManagement from '@/components/UserManagement'
 import PaymentGatewayManagement from '@/components/PaymentGatewayManagement'
 import PriceManagement from '@/components/PriceManagement'
+import NotificationDashboard from '@/components/NotificationDashboard'
+import BroadcastComposer from '@/components/BroadcastComposer'
+import NewsletterPanel from '@/components/NewsletterPanel'
+import TemplateManager from '@/components/TemplateManager'
+import NotificationLogs from '@/components/NotificationLogs'
 
 export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState('dashboard')
@@ -20,6 +25,16 @@ export default function AdminDashboard() {
         return <PaymentGatewayManagement />
       case 'prices':
         return <PriceManagement />
+        case 'notifications-dashboard':
+        return <NotificationDashboard />
+      case 'notifications-broadcast':
+        return <BroadcastComposer />
+      case 'notifications-newsletter':
+        return <NewsletterPanel />
+      case 'notifications-templates':
+        return <TemplateManager />
+      case 'notifications-logs':
+        return <NotificationLogs />
       default:
         return <DashboardStats />
     }
