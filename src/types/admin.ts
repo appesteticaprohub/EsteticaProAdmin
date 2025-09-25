@@ -49,10 +49,10 @@ export interface BroadcastNotificationRequest {
   message: string
   cta_text?: string
   cta_url?: string
-  audience: 'all' | 'active' | 'inactive' | 'by_country' | 'by_specialty'
-  audience_filter?: string
+  audience: BroadcastAudience
   template_id?: string
   scheduled_at?: string
+  expires_at?: string
 }
 
 export interface EmailTemplateRequest {
@@ -65,6 +65,36 @@ export interface EmailTemplateRequest {
 export interface NewsletterSendRequest {
   post_ids: string[]
   subject?: string
+}
+
+// Tipos para broadcast masivo
+export interface BroadcastAudience {
+  type: 'all' | 'active' | 'inactive' | 'by_country' | 'by_specialty'
+  filter?: string
+  count?: number
+}
+
+export interface BroadcastJob {
+  id: string
+  type: 'email' | 'in_app' | 'both'
+  category: 'critical' | 'important' | 'normal' | 'promotional'
+  title: string
+  message: string
+  audience: BroadcastAudience
+  total_recipients: number
+  sent_count: number
+  failed_count: number
+  status: 'pending' | 'sending' | 'completed' | 'failed'
+  created_at: string
+  started_at?: string
+  completed_at?: string
+}
+
+export interface BroadcastResponse {
+  job_id: string
+  total_recipients: number
+  estimated_time: string
+  status: 'queued' | 'started' | 'completed' | 'failed'
 }
 
 export interface NotificationStats {
