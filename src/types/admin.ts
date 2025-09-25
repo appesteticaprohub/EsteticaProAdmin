@@ -41,10 +41,49 @@ export interface Comment {
   deleted_at: string | null
 }
 
+// Tipos para sistema de notificaciones admin
+export interface BroadcastNotificationRequest {
+  type: 'email' | 'in_app' | 'both'
+  category: 'critical' | 'important' | 'normal' | 'promotional'
+  title: string
+  message: string
+  cta_text?: string
+  cta_url?: string
+  audience: 'all' | 'active' | 'inactive' | 'by_country' | 'by_specialty'
+  audience_filter?: string
+  template_id?: string
+  scheduled_at?: string
+}
+
+export interface EmailTemplateRequest {
+  template_key: string
+  subject: string
+  html_content: string
+  is_active?: boolean
+}
+
+export interface NewsletterSendRequest {
+  post_ids: string[]
+  subject?: string
+}
+
+export interface NotificationStats {
+  total_sent_today: number
+  total_sent_week: number
+  total_sent_month: number
+  active_notifications: number
+  failed_emails: number
+  newsletter_subscribers: number
+}
+
 // Tipos específicos del admin
 export interface AdminStats {
   totalUsers: number
   totalPosts: number
   totalComments: number
   activeSubscriptions: number
+  // Nuevas estadísticas de notificaciones
+  emailsSentToday: number
+  activeNotifications: number
+  newsletterSubscribers: number
 }
