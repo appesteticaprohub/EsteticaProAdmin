@@ -51,6 +51,7 @@ export interface BroadcastNotificationRequest {
   cta_url?: string
   audience: BroadcastAudience
   template_id?: string
+  template_key?: string | null 
   scheduled_at?: string
   expires_at?: string
 }

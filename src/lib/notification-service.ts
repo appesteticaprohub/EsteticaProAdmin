@@ -98,19 +98,20 @@ export class NotificationBroadcastService {
   // Enviar emails masivos
   static async sendBroadcastEmails(
     users: Profile[],
-    notification: Pick<BroadcastNotificationRequest, 'title' | 'message' | 'category' | 'template_id' | 'cta_text' | 'cta_url'>
+    notification: Pick<BroadcastNotificationRequest, 'title' | 'message' | 'category' | 'template_id' | 'template_key' | 'cta_text' | 'cta_url'>
   ): Promise<{ success: number; failed: number }> {
     const supabase = await createServerSupabaseAdminClient()
     
     let template = null
     let htmlContent = ''
     let subject = notification.title
+    let templateKey = notification.template_key || 'broadcast_custom' // Default si no hay template
 
     // Si hay template_id, obtener template
     if (notification.template_id) {
       const { data: templateData } = await supabase
         .from('email_templates')
-        .select('subject, html_content')
+        .select('subject, html_content, template_key')
         .eq('id', notification.template_id)
         .eq('is_active', true)
         .single()
@@ -119,6 +120,7 @@ export class NotificationBroadcastService {
         template = templateData
         subject = templateData.subject
         htmlContent = templateData.html_content
+        templateKey = templateData.template_key // Usar el template_key del template
       }
     }
 
@@ -160,7 +162,7 @@ export class NotificationBroadcastService {
         // Log del envío
         emailLogs.push({
           user_id: user.id,
-          template_key: 'broadcast',
+          template_key: templateKey, // Usar el template_key correcto
           email: user.email,
           status: result.success ? 'sent' : 'failed',
           resend_id: result.data?.data?.id || null,
@@ -182,7 +184,7 @@ export class NotificationBroadcastService {
         
         emailLogs.push({
           user_id: user.id,
-          template_key: 'broadcast',
+          template_key: templateKey, // Usar el template_key correcto
           email: user.email,
           status: 'failed',
           resend_id: null,

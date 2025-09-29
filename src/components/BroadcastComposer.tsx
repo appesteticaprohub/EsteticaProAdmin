@@ -115,6 +115,11 @@ export default function BroadcastComposer() {
 
     setSending(true)
     try {
+      // Obtener el template_key si hay uno seleccionado
+      const selectedTemplateData = selectedTemplate 
+        ? templates.find(t => t.id === selectedTemplate)
+        : null
+
       // Adaptar el formato al que espera el API
       const payload = {
         type: form.type,
@@ -123,6 +128,7 @@ export default function BroadcastComposer() {
         message: form.message,
         cta_text: form.cta_text,
         cta_url: form.cta_url,
+        template_key: selectedTemplateData?.template_key || null, // Enviar template_key si existe
         audience: {
           type: form.audience,
           filter: form.country || form.specialty || undefined
