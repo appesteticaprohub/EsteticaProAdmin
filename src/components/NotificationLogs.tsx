@@ -40,6 +40,9 @@ export default function NotificationLogs() {
   const [hasMore, setHasMore] = useState(false)
   const [availableTemplates, setAvailableTemplates] = useState<string[]>([])
   const [showFilters, setShowFilters] = useState(false)
+  const [selectedLogs, setSelectedLogs] = useState<string[]>([])
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     fetchLogs()
@@ -47,7 +50,6 @@ export default function NotificationLogs() {
   }, [])
 
   useEffect(() => {
-    // Reset pagination when filters change
     const newFilters = { ...filters, offset: 0 }
     setFilters(newFilters)
     fetchLogsWithFilters(newFilters)
@@ -73,7 +75,6 @@ export default function NotificationLogs() {
         const result = await response.json()
         const data = result.data || result
         
-        // Combinar email_logs y notifications en un solo array
         const combinedLogs = [
           ...(data.email_logs || []).map((log: any) => ({
             id: log.id,
@@ -163,7 +164,6 @@ export default function NotificationLogs() {
   }
 
   const formatDate = (dateString: string) => {
-    // Interpretar como UTC y mostrar UTC
     const date = new Date(dateString)
     const utcDay = String(date.getUTCDate()).padStart(2, '0')
     const utcMonth = String(date.getUTCMonth() + 1).padStart(2, '0')
@@ -204,6 +204,62 @@ export default function NotificationLogs() {
     }
   }
 
+  const toggleSelectLog = (logId: string) => {
+    setSelectedLogs(prev =>
+      prev.includes(logId)
+        ? prev.filter(id => id !== logId)
+        : [...prev, logId]
+    )
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedLogs.length === logs.length) {
+      setSelectedLogs([])
+    } else {
+      setSelectedLogs(logs.map(log => log.id))
+    }
+  }
+
+  const handleDeleteSelected = () => {
+    if (selectedLogs.length === 0) {
+      alert('Selecciona al menos un log para eliminar')
+      return
+    }
+    setShowDeleteModal(true)
+  }
+
+  const confirmDelete = async () => {
+    setDeleting(true)
+    try {
+      const response = await fetch('/api/admin/notifications/logs', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          log_ids: selectedLogs,
+          type: 'email'
+        })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        alert(`${result.data.deleted_count} logs eliminados exitosamente`)
+        setSelectedLogs([])
+        setShowDeleteModal(false)
+        fetchLogs()
+      } else {
+        const error = await response.json()
+        alert(`Error al eliminar: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Error eliminando logs:', error)
+      alert('Error al eliminar logs')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <div className="px-4 py-6">
       <div className="mb-6">
@@ -211,7 +267,6 @@ export default function NotificationLogs() {
         <p className="text-gray-600 mt-1">Historial completo de emails y notificaciones enviadas</p>
       </div>
 
-      {/* Filtros */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Filtros</h3>
@@ -229,8 +284,15 @@ export default function NotificationLogs() {
               Exportar CSV
             </button>
             <button
+              onClick={handleDeleteSelected}
+              disabled={selectedLogs.length === 0}
+              className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+            >
+              Eliminar ({selectedLogs.length})
+            </button>
+            <button
               onClick={clearFilters}
-              className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+              className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
             >
               Limpiar Filtros
             </button>
@@ -300,12 +362,16 @@ export default function NotificationLogs() {
           </div>
         )}
 
-        <div className="mt-4 text-sm text-gray-600">
-          Mostrando {logs?.length || 0} de {totalLogs} registros
+        <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+          <span>Mostrando {logs?.length || 0} de {totalLogs} registros</span>
+          {selectedLogs.length > 0 && (
+            <span className="text-blue-600 font-medium">
+              {selectedLogs.length} seleccionados
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Lista de logs */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         {loading && (!logs || logs.length === 0) ? (
           <div className="p-8">
@@ -323,55 +389,78 @@ export default function NotificationLogs() {
             </div>
           </div>
         ) : logs && logs.length > 0 ? (
-          <div className="divide-y divide-gray-200">
-            {logs.map((log) => (
-              <div key={log.id} className="p-6 hover:bg-gray-50 transition-colors">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <span className="text-lg">{getStatusIcon(log.status)}</span>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(log.status)}`}>
-                        {getStatusText(log.status)}
-                      </span>
-                      <span className="text-sm font-medium text-gray-900">
-                        {log.email}
-                      </span>
-                    </div>
+          <>
+            <div className="p-4 bg-gray-50 border-b border-gray-200">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedLogs.length === logs.length && logs.length > 0}
+                  onChange={toggleSelectAll}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  Seleccionar todos ({logs.length})
+                </span>
+              </label>
+            </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-gray-600">
-                      <div>
-                        <span className="font-medium">Template:</span>
-                        <p className="text-gray-900">{log.template_key}</p>
+            <div className="divide-y divide-gray-200">
+              {logs.map((log) => (
+                <div key={log.id} className="p-6 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start space-x-4">
+                    <input
+                      type="checkbox"
+                      checked={selectedLogs.includes(log.id)}
+                      onChange={() => toggleSelectLog(log.id)}
+                      className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                    />
+                    
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <span className="text-lg">{getStatusIcon(log.status)}</span>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(log.status)}`}>
+                          {getStatusText(log.status)}
+                        </span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {log.email}
+                        </span>
                       </div>
-                      
-                      <div>
-                        <span className="font-medium">Fecha:</span>
-                        <p className="text-gray-900">{formatDate(log.sent_at)}</p>
-                      </div>
-                      
-                      {log.resend_id && (
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-gray-600">
                         <div>
-                          <span className="font-medium">ID Resend:</span>
-                          <p className="text-gray-900 font-mono text-xs">{log.resend_id}</p>
+                          <span className="font-medium">Template:</span>
+                          <p className="text-gray-900">{log.template_key}</p>
+                        </div>
+                        
+                        <div>
+                          <span className="font-medium">Fecha:</span>
+                          <p className="text-gray-900">{formatDate(log.sent_at)}</p>
+                        </div>
+                        
+                        {log.resend_id && (
+                          <div>
+                            <span className="font-medium">ID Resend:</span>
+                            <p className="text-gray-900 font-mono text-xs">{log.resend_id}</p>
+                          </div>
+                        )}
+                        
+                        <div>
+                          <span className="font-medium">Usuario ID:</span>
+                          <p className="text-gray-900 font-mono text-xs">{log.user_id.substring(0, 8)}...</p>
+                        </div>
+                      </div>
+
+                      {log.error_message && (
+                        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
+                          <span className="text-sm font-medium text-red-800">Error:</span>
+                          <p className="text-sm text-red-700 mt-1">{log.error_message}</p>
                         </div>
                       )}
-                      
-                      <div>
-                        <span className="font-medium">Usuario ID:</span>
-                        <p className="text-gray-900 font-mono text-xs">{log.user_id.substring(0, 8)}...</p>
-                      </div>
                     </div>
-
-                    {log.error_message && (
-                      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
-                        <span className="text-sm font-medium text-red-800">Error:</span>
-                        <p className="text-sm text-red-700 mt-1">{log.error_message}</p>
-                      </div>
-                    )}
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
 
             {hasMore && (
               <div className="p-6 text-center border-t border-gray-200">
@@ -384,7 +473,7 @@ export default function NotificationLogs() {
                 </button>
               </div>
             )}
-          </div>
+          </>
         ) : (
           <div className="p-8 text-center">
             <div className="text-4xl mb-4">📋</div>
@@ -398,7 +487,6 @@ export default function NotificationLogs() {
         )}
       </div>
 
-      {/* Estadísticas rápidas */}
       {logs && logs.length > 0 && (
         <div className="mt-6 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Estadísticas de la Consulta</h3>
@@ -426,6 +514,37 @@ export default function NotificationLogs() {
                 {new Set(logs.map(log => log.email)).size}
               </p>
               <p className="text-sm text-gray-600">Usuarios Únicos</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Confirmar Eliminación
+            </h3>
+            <p className="text-gray-600 mb-6">
+              ¿Estás seguro de eliminar {selectedLogs.length} log{selectedLogs.length > 1 ? 's' : ''}?
+              <br />
+              <span className="text-red-600 font-medium">Esta acción no se puede deshacer.</span>
+            </p>
+            <div className="flex space-x-3 justify-end">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleting}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleting}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {deleting ? 'Eliminando...' : 'Eliminar'}
+              </button>
             </div>
           </div>
         </div>

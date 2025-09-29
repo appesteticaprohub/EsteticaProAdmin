@@ -176,3 +176,63 @@ export async function GET(request: NextRequest) {
     }, { status: 500 })
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const body = await request.json()
+    
+    const { log_ids, type } = body
+
+    if (!log_ids || !Array.isArray(log_ids) || log_ids.length === 0) {
+      return NextResponse.json<ApiResponse<null>>({
+        data: null,
+        error: 'Se requiere un array de IDs para eliminar'
+      }, { status: 400 })
+    }
+
+    if (!type || (type !== 'email' && type !== 'notification')) {
+      return NextResponse.json<ApiResponse<null>>({
+        data: null,
+        error: 'Se requiere especificar el tipo: email o notification'
+      }, { status: 400 })
+    }
+
+    const supabase = await createServerSupabaseAdminClient()
+    
+    if (type === 'email') {
+      // Eliminar email logs
+      const { error } = await supabase
+        .from('email_logs')
+        .delete()
+        .in('id', log_ids)
+
+      if (error) {
+        throw new Error(`Error eliminando email logs: ${error.message}`)
+      }
+    } else if (type === 'notification') {
+      // Eliminar notificaciones
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .in('id', log_ids)
+
+      if (error) {
+        throw new Error(`Error eliminando notificaciones: ${error.message}`)
+      }
+    }
+
+    return NextResponse.json<ApiResponse<{ deleted_count: number }>>({
+      data: { deleted_count: log_ids.length },
+      error: null
+    })
+
+  } catch (error) {
+    console.error('Error eliminando logs:', error)
+    
+    return NextResponse.json<ApiResponse<null>>({
+      data: null,
+      error: error instanceof Error ? error.message : 'Error interno del servidor'
+    }, { status: 500 })
+  }
+}
