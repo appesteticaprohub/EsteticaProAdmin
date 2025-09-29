@@ -66,17 +66,30 @@ export class NotificationBroadcastService {
     
     console.log('📝 Creando notificaciones in-app para:', users.length, 'usuarios')
     
-    const notifications = users.map(user => ({
-      user_id: user.id,
-      type: 'in_app' as const,
-      category: notification.category,
-      title: notification.title,
-      message: notification.message,
-      cta_text: notification.cta_text || null,
-      cta_url: notification.cta_url || null,
-      expires_at: notification.expires_at || null,
-      is_read: false
-    }))
+    const notifications = users.map(user => {
+      // Reemplazar variables en título y mensaje
+      const personalizedTitle = this.replaceVariables(notification.title, {
+        nombre: user.full_name || 'Usuario',
+        email: user.email
+      })
+      
+      const personalizedMessage = this.replaceVariables(notification.message, {
+        nombre: user.full_name || 'Usuario',
+        email: user.email
+      })
+
+      return {
+        user_id: user.id,
+        type: 'in_app' as const,
+        category: notification.category,
+        title: personalizedTitle,
+        message: personalizedMessage,
+        cta_text: notification.cta_text || null,
+        cta_url: notification.cta_url || null,
+        expires_at: notification.expires_at || null,
+        is_read: false
+      }
+    })
 
     console.log('📝 Insertando:', notifications)
 
