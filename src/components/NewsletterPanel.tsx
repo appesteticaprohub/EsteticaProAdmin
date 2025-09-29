@@ -200,13 +200,46 @@ export default function NewsletterPanel() {
 
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return 'Nunca'
-    return new Date(dateString).toLocaleString('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+    
+    // Crear objeto Date desde el string UTC
+    const date = new Date(dateString)
+    
+    // Obtener componentes UTC y restar 5 horas manualmente para Colombia
+    let utcHours = date.getUTCHours()
+    let utcMinutes = date.getUTCMinutes()
+    let utcDay = date.getUTCDate()
+    let utcMonth = date.getUTCMonth() + 1
+    let utcYear = date.getUTCFullYear()
+    
+    // Restar 5 horas
+    utcHours -= 5
+    
+    // Ajustar si las horas son negativas (día anterior)
+    if (utcHours < 0) {
+      utcHours += 24
+      utcDay -= 1
+      
+      // Ajustar el mes si es necesario
+      if (utcDay < 1) {
+        utcMonth -= 1
+        if (utcMonth < 1) {
+          utcMonth = 12
+          utcYear -= 1
+        }
+        // Días del mes anterior (simplificado)
+        const daysInMonth = new Date(utcYear, utcMonth, 0).getDate()
+        utcDay = daysInMonth
+      }
+    }
+    
+    const day = String(utcDay).padStart(2, '0')
+    const month = String(utcMonth).padStart(2, '0')
+    const year = utcYear
+    const minutes = String(utcMinutes).padStart(2, '0')
+    const ampm = utcHours >= 12 ? 'p. m.' : 'a. m.'
+    const hours12 = utcHours % 12 || 12
+    
+    return `${day}/${month}/${year}, ${String(hours12).padStart(2, '0')}:${minutes} ${ampm}`
   }
 
   const truncateContent = (content: string, maxLength: number = 150) => {
