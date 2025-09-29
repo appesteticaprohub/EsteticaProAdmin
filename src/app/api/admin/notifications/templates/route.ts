@@ -19,7 +19,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      data: templates,
+      templates: templates || [],
       error: null
     })
 

@@ -4,8 +4,9 @@ import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 // PUT - Actualizar template
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   try {
     const body = await request.json()
     const { subject, html_content, is_active } = body
@@ -16,7 +17,7 @@ export async function PUT(
     const { data: existingTemplate } = await supabase
       .from('email_templates')
       .select('is_system')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (existingTemplate?.is_system) {
@@ -34,7 +35,7 @@ export async function PUT(
     const { data: template, error } = await supabase
       .from('email_templates')
       .update(updateData)
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single()
 
@@ -61,8 +62,9 @@ export async function PUT(
 // DELETE - Eliminar template
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   try {
     const supabase = await createServerSupabaseAdminClient()
 
@@ -70,7 +72,7 @@ export async function DELETE(
     const { data: existingTemplate } = await supabase
       .from('email_templates')
       .select('is_system')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (existingTemplate?.is_system) {
@@ -83,7 +85,7 @@ export async function DELETE(
     const { error } = await supabase
       .from('email_templates')
       .delete()
-      .eq('id', params.id)
+      .eq('id', id)
 
     if (error) {
       return NextResponse.json(

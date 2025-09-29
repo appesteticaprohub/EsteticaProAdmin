@@ -70,16 +70,31 @@ export default function NotificationLogs() {
 
       const response = await fetch(`/api/admin/notifications/logs?${params}`)
       if (response.ok) {
-        const data: LogsResponse = await response.json()
+        const result = await response.json()
+        const data = result.data || result
+        
+        // Combinar email_logs y notifications en un solo array
+        const combinedLogs = [
+          ...(data.email_logs || []).map((log: any) => ({
+            id: log.id,
+            user_id: log.user_id,
+            template_key: log.template_key,
+            email: log.email,
+            status: log.status,
+            resend_id: log.resend_id,
+            error_message: log.error_message,
+            sent_at: log.sent_at
+          }))
+        ]
         
         if (currentFilters.offset === 0) {
-          setLogs(data.logs)
+          setLogs(combinedLogs)
         } else {
-          setLogs(prev => [...prev, ...data.logs])
+          setLogs(prev => [...prev, ...combinedLogs])
         }
         
-        setTotalLogs(data.total)
-        setHasMore(data.has_more)
+        setTotalLogs(data.pagination?.total_records || combinedLogs.length)
+        setHasMore(data.pagination?.has_next || false)
       }
     } catch (error) {
       console.error('Error fetching logs:', error)
@@ -148,14 +163,18 @@ export default function NotificationLogs() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    })
+    // Interpretar como UTC y mostrar UTC
+    const date = new Date(dateString)
+    const utcDay = String(date.getUTCDate()).padStart(2, '0')
+    const utcMonth = String(date.getUTCMonth() + 1).padStart(2, '0')
+    const utcYear = date.getUTCFullYear()
+    const utcHours = date.getUTCHours()
+    const utcMinutes = String(date.getUTCMinutes()).padStart(2, '0')
+    const utcSeconds = String(date.getUTCSeconds()).padStart(2, '0')
+    const ampm = utcHours >= 12 ? 'p. m.' : 'a. m.'
+    const hours12 = utcHours % 12 || 12
+    
+    return `${utcDay}/${utcMonth}/${utcYear}, ${String(hours12).padStart(2, '0')}:${utcMinutes}:${utcSeconds} ${ampm} UTC`
   }
 
   const getStatusColor = (status: string) => {
@@ -386,25 +405,7 @@ export default function NotificationLogs() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="text-center">
               <p className="text-2xl font-bold text-green-600">
-                {logs?.filter(log => log.status === 'sent' || log.status === 'delivered').length || 0}
-              </p>
-              <p className="text-sm text-gray-600">Exitosos</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-red-600">
-                {logs?.filter(log => log.status === 'failed').length || 0}
-              </p>
-              <p className="text-sm text-gray-600">Fallidos</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-blue-600">
-                {new Set(logs?.map(log => log.template_key) || []).size}
-              </p>
-              <p className="text-sm text-gray-600">Templates Únicos</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-purple-600">
-                {new Set(logs?.map(log => log.email) || []).size}
+                {logs.filter(log => log.status === 'sent' || log.status === 'delivered').length}
               </p>
               <p className="text-sm text-gray-600">Exitosos</p>
             </div>

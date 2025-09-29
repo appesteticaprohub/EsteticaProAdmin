@@ -123,32 +123,31 @@ export async function GET() {
     const successRate = totalEmails ? Math.round((successfulEmails / totalEmails) * 100) : 100
 
     // Construir respuesta
-    const stats: DetailedStats = {
+    const stats = {
       emails: {
-        sent_today: emailsSentToday || 0,
-        sent_this_week: emailsSentWeek || 0,
-        sent_this_month: emailsSentMonth || 0,
-        failed_today: emailsFailedToday || 0,
+        today: emailsSentToday || 0,
+        week: emailsSentWeek || 0,
+        month: emailsSentMonth || 0,
         success_rate: successRate
       },
       notifications: {
-        active_count: activeNotifications || 0,
-        read_count: readNotifications || 0,
-        unread_count: unreadNotifications || 0,
-        critical_count: criticalNotifications || 0
+        active: activeNotifications || 0,
+        total_sent: (readNotifications || 0) + (unreadNotifications || 0),
+        unread_count: unreadNotifications || 0
       },
       templates: {
-        most_used: mostUsedTemplates,
-        total_templates: totalTemplates || 0
+        total: totalTemplates || 0,
+        active: totalTemplates || 0,
+        system: 0
       },
       users: {
-        newsletter_subscribers: newsletterSubscribers || 0,
-        promotional_subscribers: promotionalSubscribers || 0,
-        total_users: totalUsers || 0
+        total_recipients: totalUsers || 0,
+        email_enabled: totalUsers || 0,
+        promotional_enabled: promotionalSubscribers || 0
       }
     }
 
-    return NextResponse.json<ApiResponse<DetailedStats>>({
+    return NextResponse.json({
       data: stats,
       error: null
     })

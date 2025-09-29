@@ -43,15 +43,23 @@ export default function BroadcastComposer() {
     setLoading(true)
     try {
       const params = new URLSearchParams({
-        audience: form.audience,
-        ...(form.country && { country: form.country }),
-        ...(form.specialty && { specialty: form.specialty })
+        audience_type: form.audience
       })
+
+      if (form.country) {
+        params.append('audience_filter', form.country)
+      } else if (form.specialty) {
+        params.append('audience_filter', form.specialty)
+      }
 
       const response = await fetch(`/api/admin/notifications/broadcast?${params}`)
       if (response.ok) {
-        const data = await response.json()
-        setAudiencePreview(data)
+        const result = await response.json()
+        const data = result.data || result
+        setAudiencePreview({
+          count: data.count || 0,
+          recipients: []
+        })
       }
     } catch (error) {
       console.error('Error fetching audience preview:', error)
@@ -60,23 +68,39 @@ export default function BroadcastComposer() {
     }
   }
 
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.title || !form.message) return
 
     setSending(true)
     try {
+      // Adaptar el formato al que espera el API
+      const payload = {
+        type: form.type,
+        category: form.priority, // priority -> category
+        title: form.title,
+        message: form.message,
+        cta_text: form.cta_text,
+        cta_url: form.cta_url,
+        audience: {
+          type: form.audience,
+          filter: form.country || form.specialty || undefined
+        }
+      }
+
       const response = await fetch('/api/admin/notifications/broadcast', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(form)
+        body: JSON.stringify(payload)
       })
 
       if (response.ok) {
         const result = await response.json()
-        alert(`¡Broadcast enviado exitosamente!\n\nEmails: ${result.email_count}\nNotificaciones: ${result.notification_count}`)
+        const data = result.data || result
+        alert(`¡Broadcast enviado exitosamente!\n\nEmails: ${data.email_count || 0}\nNotificaciones: ${data.notification_count || 0}`)
         
         // Limpiar formulario
         setForm({
@@ -89,7 +113,7 @@ export default function BroadcastComposer() {
         setShowPreview(false)
       } else {
         const error = await response.json()
-        alert(`Error al enviar: ${error.message}`)
+        alert(`Error al enviar: ${error.error || error.message}`)
       }
     } catch (error) {
       console.error('Error sending broadcast:', error)

@@ -21,10 +21,10 @@ export class NotificationBroadcastService {
     // Aplicar filtros según tipo de audiencia
     switch (audience.type) {
       case 'active':
-        query = query.in('subscription_status', ['active', 'trialing'])
+        query = query.or('subscription_status.ilike.active,subscription_status.ilike.trialing')
         break
       case 'inactive':
-        query = query.in('subscription_status', ['canceled', 'expired', 'suspended'])
+        query = query.or('subscription_status.ilike.canceled,subscription_status.ilike.expired,subscription_status.ilike.suspended')
         break
       case 'by_country':
         if (audience.filter) {
@@ -64,6 +64,8 @@ export class NotificationBroadcastService {
   ): Promise<{ success: number; failed: number }> {
     const supabase = await createServerSupabaseAdminClient()
     
+    console.log('📝 Creando notificaciones in-app para:', users.length, 'usuarios')
+    
     const notifications = users.map(user => ({
       user_id: user.id,
       type: 'in_app' as const,
@@ -76,15 +78,19 @@ export class NotificationBroadcastService {
       is_read: false
     }))
 
+    console.log('📝 Insertando:', notifications)
+
     const { data, error } = await supabase
       .from('notifications')
       .insert(notifications)
       .select('id')
 
     if (error) {
-      console.error('Error creando notificaciones in-app:', error)
+      console.error('❌ Error creando notificaciones in-app:', error)
       return { success: 0, failed: users.length }
     }
+
+    console.log('✅ Notificaciones creadas:', data?.length || 0)
 
     return { success: data?.length || 0, failed: users.length - (data?.length || 0) }
   }
@@ -92,7 +98,7 @@ export class NotificationBroadcastService {
   // Enviar emails masivos
   static async sendBroadcastEmails(
     users: Profile[],
-    notification: Pick<BroadcastNotificationRequest, 'title' | 'message' | 'category' | 'template_id'>
+    notification: Pick<BroadcastNotificationRequest, 'title' | 'message' | 'category' | 'template_id' | 'cta_text' | 'cta_url'>
   ): Promise<{ success: number; failed: number }> {
     const supabase = await createServerSupabaseAdminClient()
     
@@ -118,7 +124,12 @@ export class NotificationBroadcastService {
 
     // Si no hay template, usar contenido básico
     if (!template) {
-      htmlContent = this.createBasicEmailTemplate(notification.title, notification.message)
+      htmlContent = this.createBasicEmailTemplate(
+        notification.title, 
+        notification.message,
+        notification.cta_text,
+        notification.cta_url
+      )
     }
 
     let successCount = 0
@@ -189,7 +200,15 @@ export class NotificationBroadcastService {
   }
 
   // Template básico para emails sin template personalizado
-  static createBasicEmailTemplate(title: string, message: string): string {
+  static createBasicEmailTemplate(title: string, message: string, ctaText?: string, ctaUrl?: string): string {
+    const ctaButton = ctaText && ctaUrl ? `
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${ctaUrl}" style="display: inline-block; padding: 12px 30px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
+          ${ctaText}
+        </a>
+      </div>
+    ` : ''
+
     return `
       <!DOCTYPE html>
       <html>
@@ -208,6 +227,7 @@ export class NotificationBroadcastService {
             <div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
               ${message.replace(/\n/g, '<br>')}
             </div>
+            ${ctaButton}
             <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
               Hola {{nombre}},<br>
               Este es un mensaje importante de EsteticaProHub.
@@ -264,6 +284,8 @@ export class NotificationBroadcastService {
       return {
         job_id: jobId,
         total_recipients: users.length,
+        email_count: results.email.success,
+        notification_count: results.inApp.success,
         estimated_time: `${Math.ceil(users.length / 10)} minutos`,
         status: 'completed'
       }

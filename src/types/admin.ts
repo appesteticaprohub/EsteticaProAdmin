@@ -93,6 +93,8 @@ export interface BroadcastJob {
 export interface BroadcastResponse {
   job_id: string
   total_recipients: number
+  email_count: number
+  notification_count: number
   estimated_time: string
   status: 'queued' | 'started' | 'completed' | 'failed'
 }
