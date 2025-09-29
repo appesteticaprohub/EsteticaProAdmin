@@ -44,7 +44,6 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
       icon: '🔔',
       hasSubmenu: true,
       submenu: [
-        { id: 'notifications-dashboard', name: 'Dashboard', icon: '📈' },
         { id: 'notifications-broadcast', name: 'Broadcast Masivo', icon: '📢' },
         { id: 'notifications-newsletter', name: 'Newsletter', icon: '📰' },
         { id: 'notifications-templates', name: 'Templates', icon: '📝' },
