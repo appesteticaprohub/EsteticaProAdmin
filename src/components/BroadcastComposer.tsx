@@ -31,13 +31,53 @@ export default function BroadcastComposer() {
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [templates, setTemplates] = useState<any[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('')
+  const [loadingTemplates, setLoadingTemplates] = useState(true)
+  
 
   // Obtener preview de audiencia cuando cambian los filtros
+  // Cargar templates disponibles
+  useEffect(() => {
+    fetchTemplates()
+  }, [])
   useEffect(() => {
     if (form.audience) {
       fetchAudiencePreview()
     }
   }, [form.audience, form.country, form.specialty])
+
+  const fetchTemplates = async () => {
+    setLoadingTemplates(true)
+    try {
+      const response = await fetch('/api/admin/notifications/templates')
+      if (response.ok) {
+        const result = await response.json()
+        const data = result.data || result
+        // Filtrar solo templates activos
+        const activeTemplates = (data.templates || []).filter((t: any) => t.is_active)
+        setTemplates(activeTemplates)
+      }
+    } catch (error) {
+      console.error('Error fetching templates:', error)
+    } finally {
+      setLoadingTemplates(false)
+    }
+  }
+
+  const loadTemplate = async () => {
+    if (!selectedTemplate) return
+    
+    const template = templates.find(t => t.id === selectedTemplate)
+    if (!template) return
+
+    // Cargar el contenido del template al formulario
+    setForm({
+      ...form,
+      title: template.subject || form.title,
+      message: template.html_content || form.message
+    })
+  }
 
   const fetchAudiencePreview = async () => {
     setLoading(true)
@@ -252,6 +292,41 @@ export default function BroadcastComposer() {
             {/* Contenido */}
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Contenido del Mensaje</h3>
+              
+              {/* Selector de templates */}
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  📋 Usar Template Existente (Opcional)
+                </label>
+                <div className="flex space-x-2">
+                  <select
+                    value={selectedTemplate}
+                    onChange={(e) => setSelectedTemplate(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={loadingTemplates}
+                  >
+                    <option value="">Seleccionar template...</option>
+                    {templates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.template_key} - {template.subject}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={loadTemplate}
+                    disabled={!selectedTemplate}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Cargar
+                  </button>
+                </div>
+                {selectedTemplate && (
+                  <p className="text-xs text-gray-600 mt-2">
+                    💡 Al cargar el template, su contenido reemplazará el título y mensaje actual
+                  </p>
+                )}
+              </div>
               
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
