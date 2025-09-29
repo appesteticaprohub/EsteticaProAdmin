@@ -16,24 +16,16 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createServerSupabaseAdminClient()
 
-    // Obtener posts seleccionados con información del autor
-    const { data: posts, error } = await supabase
+    // Obtener posts seleccionados
+    const { data: posts, error: postsError } = await supabase
       .from('posts')
-      .select(`
-        id,
-        title,
-        content,
-        created_at,
-        category,
-        author_id,
-        profiles!inner(full_name, email)
-      `)
+      .select('id, title, content, created_at, category, author_id')
       .in('id', post_ids)
       .order('created_at', { ascending: false })
 
-    if (error) {
+    if (postsError) {
       return NextResponse.json(
-        { data: null, error: error.message },
+        { data: null, error: postsError.message },
         { status: 500 }
       )
     }
@@ -45,27 +37,42 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Obtener información de autores
+    const authorIds = posts.map(p => p.author_id)
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', authorIds)
+
+    const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
+    
+    // Agregar profile a cada post
+    const postsWithProfiles = posts.map(post => ({
+      ...post,
+      profiles: profileMap.get(post.author_id)
+    }))
+
     // Generar HTML de la newsletter
-    const newsletterHtml = generateNewsletterHtml(posts, custom_subject)
+    const newsletterHtml = generateNewsletterHtml(postsWithProfiles, custom_subject)
     
     // Obtener conteo de destinatarios
-    const { count: recipientCount } = await supabase.rpc('get_content_email_recipients')
+    const { count: recipientCount } = await supabase
+      .from('notification_preferences')
+      .select('*', { count: 'exact', head: true })
+      .eq('email_content', true)
 
     return NextResponse.json({
       data: {
         html_preview: newsletterHtml,
         subject: custom_subject || 'Lo Nuevo en EsteticaProHub',
         recipient_count: recipientCount || 0,
-        posts_included: posts.length,
-        posts: posts.map(post => {
-          const profile = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles
-          return {
-            id: post.id,
-            title: post.title,
-            author: profile?.full_name || profile?.email,
-            created_at: post.created_at
-          }
-        })
+        posts_included: postsWithProfiles.length,
+        posts: postsWithProfiles.map(post => ({
+          id: post.id,
+          title: post.title,
+          author: post.profiles?.full_name || post.profiles?.email,
+          created_at: post.created_at
+        }))
       },
       error: null
     })

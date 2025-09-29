@@ -14,13 +14,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!confirm_send) {
-      return NextResponse.json(
-        { data: null, error: 'Confirmación de envío requerida (confirm_send: true)' },
-        { status: 400 }
-      )
-    }
-
     const supabase = await createServerSupabaseAdminClient()
 
     // Verificar que newsletter está habilitada
@@ -37,7 +30,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Obtener destinatarios
-    const { data: recipients, error: recipientsError } = await supabase.rpc('get_content_email_recipients')
+    // Obtener destinatarios (usuarios con email_content = true)
+    const { data: preferences, error: recipientsError } = await supabase
+      .from('notification_preferences')
+      .select('user_id, profiles!inner(id, email, full_name)')
+      .eq('email_content', true)
+
+    const recipients = preferences?.map(pref => {
+      const profile = Array.isArray(pref.profiles) ? pref.profiles[0] : pref.profiles
+      return {
+        user_id: pref.user_id,
+        email: profile?.email,
+        full_name: profile?.full_name
+      }
+    }).filter(r => r.email) || []
+
+    console.log('📧 Recipients encontrados:', recipients.length)
+    console.log('📧 Recipients:', recipients)
 
     if (recipientsError || !recipients) {
       return NextResponse.json(
@@ -56,17 +65,30 @@ export async function POST(request: NextRequest) {
     // Obtener posts seleccionados
     const { data: posts, error: postsError } = await supabase
       .from('posts')
-      .select(`
-        id,
-        title,
-        content,
-        created_at,
-        category,
-        author_id,
-        profiles!inner(full_name, email)
-      `)
+      .select('id, title, content, created_at, category, author_id')
       .in('id', post_ids)
       .order('created_at', { ascending: false })
+
+    if (postsError || !posts || posts.length === 0) {
+      return NextResponse.json(
+        { data: null, error: 'Error obteniendo posts seleccionados' },
+        { status: 500 }
+      )
+    }
+
+    // Obtener información de autores
+    const authorIds = posts.map(p => p.author_id)
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', authorIds)
+
+    const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
+    
+    const postsWithProfiles = posts.map(post => ({
+      ...post,
+      profiles: profileMap.get(post.author_id)
+    }))
 
     if (postsError || !posts || posts.length === 0) {
       return NextResponse.json(
@@ -78,15 +100,23 @@ export async function POST(request: NextRequest) {
     // Iniciar proceso de envío masivo
     const sendResult = await sendNewsletterToRecipients(
       recipients,
-      posts,
+      postsWithProfiles,
       custom_subject || 'Lo Nuevo en EsteticaProHub'
     )
 
     // Actualizar configuración de newsletter con última fecha de envío
-    await supabase
+    console.log('📅 Actualizando last_sent_at para settings.id:', settings.id)
+    const { data: updatedSettings, error: updateError } = await supabase
       .from('newsletter_settings')
       .update({ last_sent_at: new Date().toISOString() })
       .eq('id', settings.id)
+      .select()
+    
+    if (updateError) {
+      console.error('❌ Error actualizando last_sent_at:', updateError)
+    } else {
+      console.log('✅ last_sent_at actualizado:', updatedSettings)
+    }
 
     return NextResponse.json({
       data: {
@@ -109,6 +139,10 @@ export async function POST(request: NextRequest) {
 
 // Función para envío masivo de newsletter
 async function sendNewsletterToRecipients(recipients: any[], posts: any[], subject: string) {
+    console.log('📮 Iniciando envío de newsletter')
+  console.log('📮 Recipients:', recipients.length)
+  console.log('📮 Posts:', posts.length)
+  console.log('📮 Subject:', subject)
   // Importación dinámica para evitar problemas de módulos
   const { sendEmail } = await import('@/lib/resend')
   const supabase = await createServerSupabaseAdminClient()
@@ -122,11 +156,15 @@ async function sendNewsletterToRecipients(recipients: any[], posts: any[], subje
 
   let success_count = 0
   let failed_count = 0
+  const emailLogs: any[] = []
 
   // Generar HTML de posts
   const postsHtml = generatePostsHtml(posts)
 
+  
+
   for (const recipient of recipients) {
+        console.log('📤 Enviando a:', recipient.email)
     try {
       let finalHtml = template?.html_content || generateDefaultNewsletterTemplate()
 
@@ -148,6 +186,18 @@ async function sendNewsletterToRecipients(recipients: any[], posts: any[], subje
         userId: recipient.user_id
       })
 
+      console.log('📬 Resultado para', recipient.email, ':', emailResult)
+
+      // Guardar log del envío
+      emailLogs.push({
+        user_id: recipient.user_id,
+        template_key: 'posts_newsletter',
+        email: recipient.email,
+        status: emailResult.success ? 'sent' : 'failed',
+        resend_id: emailResult.data?.data?.id || null,
+        error_message: emailResult.error || null
+      })
+
       if (emailResult.success) {
         success_count++
       } else {
@@ -158,14 +208,42 @@ async function sendNewsletterToRecipients(recipients: any[], posts: any[], subje
     } catch (error) {
       failed_count++
       console.error(`Error enviando newsletter a ${recipient.email}:`, error)
+      
+      // Guardar log del error
+      emailLogs.push({
+        user_id: recipient.user_id,
+        template_key: 'posts_newsletter',
+        email: recipient.email,
+        status: 'failed',
+        resend_id: null,
+        error_message: error instanceof Error ? error.message : 'Error desconocido'
+      })
     }
 
     // Pequeña pausa para no saturar Resend
     await new Promise(resolve => setTimeout(resolve, 100))
   }
 
+  // Guardar logs en base de datos
+  if (emailLogs.length > 0) {
+    console.log('💾 Guardando', emailLogs.length, 'logs en BD...')
+    const { error: logError } = await supabase
+      .from('email_logs')
+      .insert(emailLogs)
+    
+    if (logError) {
+      console.error('❌ Error guardando logs:', logError)
+    } else {
+      console.log('✅ Logs guardados correctamente')
+    }
+  }
+
   return { success_count, failed_count }
 }
+
+
+
+  
 
 // Función para generar HTML de posts para newsletter
 function generatePostsHtml(posts: any[]): string {

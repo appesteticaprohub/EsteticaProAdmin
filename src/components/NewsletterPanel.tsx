@@ -17,6 +17,7 @@ interface NewsletterSettings {
   is_enabled: boolean
   last_sent_at: string | null
   posts_to_include: number
+  subscriber_count?: number
 }
 
 interface NewsletterPreview {
@@ -50,7 +51,7 @@ export default function NewsletterPanel() {
       const response = await fetch('/api/admin/newsletter/settings')
       if (response.ok) {
         const data = await response.json()
-        setSettings(data)
+        setSettings(data.data || data)
       }
     } catch (error) {
       console.error('Error fetching newsletter settings:', error)
@@ -62,13 +63,22 @@ export default function NewsletterPanel() {
       const response = await fetch('/api/admin/newsletter/posts')
       if (response.ok) {
         const data = await response.json()
-        setPosts(data.posts || [])
+        console.log('📰 Newsletter Posts Response:', data)
+        console.log('📰 Data.data:', data.data)
+        console.log('📰 Data.posts:', data.posts)
+        
+        const postsData = data.data || data.posts || []
+        console.log('📰 Posts finales:', postsData)
+        
+        setPosts(postsData)
         // Auto-seleccionar los primeros 5 posts
-        const firstFive = data.posts?.slice(0, 5).map((p: Post) => p.id) || []
+        const firstFive = postsData.slice(0, 5).map((p: Post) => p.id)
         setSelectedPosts(firstFive)
+      } else {
+        console.error('❌ Error response:', response.status)
       }
     } catch (error) {
-      console.error('Error fetching posts:', error)
+      console.error('❌ Error fetching posts:', error)
     } finally {
       setLoading(false)
     }
@@ -87,8 +97,13 @@ export default function NewsletterPanel() {
       })
       
       if (response.ok) {
-        const data = await response.json()
-        setPreview(data)
+        const result = await response.json()
+        const data = result.data || result
+        setPreview({
+          subject: data.subject,
+          html_content: data.html_preview,
+          recipients_count: data.recipient_count || 0
+        })
       }
     } catch (error) {
       console.error('Error generating preview:', error)
@@ -111,7 +126,7 @@ export default function NewsletterPanel() {
 
       if (response.ok) {
         const updatedSettings = await response.json()
-        setSettings(updatedSettings)
+        setSettings(updatedSettings.data || updatedSettings)
       }
     } catch (error) {
       console.error('Error updating newsletter settings:', error)
@@ -161,7 +176,8 @@ export default function NewsletterPanel() {
 
       if (response.ok) {
         const result = await response.json()
-        alert(`¡Newsletter enviada exitosamente!\n\nEmails enviados: ${result.sent_count}`)
+        const data = result.data || result
+        alert(`¡Newsletter enviada exitosamente!\n\nEmails enviados: ${data.emails_sent || 0}\nFallidos: ${data.emails_failed || 0}`)
         
         // Actualizar configuración para mostrar última fecha de envío
         fetchSettings()
@@ -337,7 +353,7 @@ export default function NewsletterPanel() {
               <div>
                 <span className="text-sm text-gray-600">Destinatarios:</span>
                 <p className="text-sm font-medium text-gray-900">
-                  {preview?.recipients_count || 0} usuarios
+                  {settings?.subscriber_count || preview?.recipients_count || 0} usuarios
                 </p>
               </div>
             </div>

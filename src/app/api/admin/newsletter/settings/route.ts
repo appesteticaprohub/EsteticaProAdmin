@@ -19,7 +19,10 @@ export async function GET() {
     }
 
     // También obtener el conteo de suscriptores
-    const { count: subscriberCount } = await supabase.rpc('get_content_email_recipients')
+    const { count: subscriberCount } = await supabase
+      .from('notification_preferences')
+      .select('*', { count: 'exact', head: true })
+      .eq('email_content', true)
 
     return NextResponse.json({
       data: {

@@ -11,22 +11,20 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0')
 
     // Obtener posts recientes con información del autor
+    // Primero obtener los posts
     const { data: posts, error } = await supabase
       .from('posts')
-      .select(`
-        id,
-        title,
-        content,
-        created_at,
-        views_count,
-        likes_count,
-        comments_count,
-        category,
-        author_id,
-        profiles!inner(full_name, email)
-      `)
+      .select('id, title, content, created_at, views_count, likes_count, comments_count, category, author_id')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
+
+    console.log('📊 Posts query result:', posts)
+    console.log('📊 Posts count:', posts?.length)
+    console.log('📊 Error:', error)
+
+      console.log('📊 Posts query result:', posts)
+    console.log('📊 Posts count:', posts?.length)
+    console.log('📊 Error:', error)
 
     if (error) {
       return NextResponse.json(
@@ -35,9 +33,18 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Obtener información de autores
+    const authorIds = posts?.map(p => p.author_id) || []
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', authorIds)
+
+    const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
+
     // Formatear posts para newsletter
     const formattedPosts = posts?.map(post => {
-      const profile = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles
+      const profile = profileMap.get(post.author_id)
       
       return {
         id: post.id,
