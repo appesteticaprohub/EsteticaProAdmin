@@ -30,8 +30,6 @@ export async function GET(request: NextRequest) {
       is_read: searchParams.get('is_read') ? searchParams.get('is_read') === 'true' : undefined,
     }
 
-    console.log('GET Filters recibidos:', filters)
-
     if (!filters.date_before) {
       return NextResponse.json({
         data: null,
@@ -50,7 +48,7 @@ export async function GET(request: NextRequest) {
     if (filters.category) {
       notificationsQuery = notificationsQuery.eq('category', filters.category)
     }
-    console.log('Query con category:', filters.category)
+
     if (filters.type) {
       notificationsQuery = notificationsQuery.eq('type', filters.type)
     }
@@ -58,21 +56,11 @@ export async function GET(request: NextRequest) {
       notificationsQuery = notificationsQuery.eq('is_read', filters.is_read)
     }
 
-    console.log('Ejecutando query de notificaciones con filtros:', {
-      date_before: filters.date_before,
-      category: filters.category,
-      type: filters.type,
-      is_read: filters.is_read
-    })
-
     const { data: notifications, error: notifError } = await notificationsQuery
 
     if (notifError) {
       throw new Error(`Error obteniendo notificaciones: ${notifError.message}`)
     }
-
-    console.log('Notificaciones encontradas:', notifications?.length)
-    console.log('Primeras 3 notificaciones:', notifications?.slice(0, 3))
 
     // Query para email logs
     let emailLogsQuery = supabase
