@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase';
 import { updateMultipleSubscriptionsPrices } from '../../../../lib/paypal';
+import { NotificationBroadcastService } from '@/lib/notification-service';
 
 interface UpdatePriceRequest {
   newPrice: number;
@@ -109,12 +110,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Simular notificación por email a usuarios afectados
-    if (activeSubscriptions && activeSubscriptions.length > 0) {
-      console.log(`📧 [SIMULACIÓN] Enviando notificaciones a ${activeSubscriptions.length} usuarios:`);
-      activeSubscriptions.forEach(sub => {
-        console.log(`   - ${sub.email} (${sub.full_name || 'Sin nombre'})`);
-      });
+    // Enviar notificaciones reales a todos los usuarios activos
+    let notificationResults = null
+    
+    try {
+      console.log(`📧 Enviando notificaciones de cambio de precio...`);
+      
+      const notifResult = await NotificationBroadcastService.sendPriceChangeNotification(newPrice.toString())
+      
+      if (notifResult.success && notifResult.data) {
+        notificationResults = notifResult.data
+        console.log(`✅ Notificaciones enviadas:`);
+        console.log(`   - Emails enviados: ${notifResult.data.emails_sent}`);
+        console.log(`   - Notificaciones in-app: ${notifResult.data.notifications_created}`);
+        console.log(`   - Errores: ${notifResult.data.errors}`);
+      } else {
+        console.error('❌ Error enviando notificaciones:', notifResult.error);
+      }
+    } catch (notifError) {
+      console.error('❌ Error en servicio de notificaciones:', notifError);
     }
 
     // Preparar mensaje de respuesta
@@ -146,6 +160,12 @@ export async function POST(request: NextRequest) {
         failed: failedUpdates,
         results: paypalResults
       },
+      notifications: notificationResults ? {
+        emails_sent: notificationResults.emails_sent,
+        notifications_created: notificationResults.notifications_created,
+        errors: notificationResults.errors,
+        total_users: notificationResults.total_users
+      } : null,
       newPrice,
       effectiveDate
     });

@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { createServerSupabaseAdminClient } from './server-supabase'
 
 if (!process.env.RESEND_API_KEY) {
   throw new Error('RESEND_API_KEY no está configurado')
@@ -21,7 +22,7 @@ export interface SendEmailOptions {
   userId?: string
 }
 
-// Función principal para enviar emails (versión simplificada para admin)
+// Función principal para enviar emails
 export async function sendEmail(options: SendEmailOptions) {
   try {
     const response = await resend.emails.send({
@@ -31,18 +32,62 @@ export async function sendEmail(options: SendEmailOptions) {
       html: options.html,
     })
 
+    // Log del envío en la base de datos si se proporciona templateKey y userId
+    if (options.templateKey && options.userId) {
+      await logEmailSend({
+        user_id: options.userId,
+        template_key: options.templateKey,
+        email: options.to,
+        status: 'sent',
+        resend_id: response.data?.id || null
+      })
+    }
+
     return {
       success: true,
       data: response,
       error: null
     }
-
   } catch (error) {
     console.error('Error enviando email:', error)
+    
+    // Log del error si se proporciona la información
+    if (options.templateKey && options.userId) {
+      await logEmailSend({
+        user_id: options.userId,
+        template_key: options.templateKey,
+        email: options.to,
+        status: 'failed',
+        error_message: error instanceof Error ? error.message : 'Error desconocido'
+      })
+    }
+
     return {
       success: false,
       data: null,
       error: error instanceof Error ? error.message : 'Error desconocido'
     }
+  }
+}
+
+// Función para registrar el envío de email en la base de datos
+async function logEmailSend(logData: {
+  user_id: string
+  template_key: string
+  email: string
+  status: 'sent' | 'failed' | 'delivered'
+  resend_id?: string | null
+  error_message?: string | null
+}) {
+  try {
+    const supabase = await createServerSupabaseAdminClient()
+    
+    const { error } = await supabase.from('email_logs').insert(logData)
+    
+    if (error) {
+      console.error('❌ Error guardando log de email:', error)
+    }
+  } catch (error) {
+    console.error('❌ Error en logEmailSend:', error)
   }
 }

@@ -310,4 +310,150 @@ export class NotificationBroadcastService {
       throw error
     }
   }
+
+  // Enviar notificación de cambio de precio
+  static async sendPriceChangeNotification(newPrice: string) {
+    try {
+      const supabase = await createServerSupabaseAdminClient()
+
+      // Obtener todos los usuarios activos
+      const { data: users, error } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, subscription_status')
+        .in('subscription_status', ['Active', 'Payment_Failed', 'Grace_Period'])
+
+      if (error || !users) {
+        throw new Error('Error obteniendo usuarios activos')
+      }
+
+      const results = {
+        emails_sent: 0,
+        notifications_created: 0,
+        errors: 0,
+        total_users: users.length
+      }
+
+      // Crear notificaciones in-app críticas (7 días de duración)
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+
+      type UserForNotification = {
+        id: string
+        email: string
+        full_name: string | null
+        subscription_status: string
+      }
+
+      const notifications = users.map((user: UserForNotification) => ({
+        user_id: user.id,
+        type: 'in_app' as const,
+        category: 'critical' as const,
+        title: 'Actualización de Precios',
+        message: `El precio de suscripción ha sido actualizado a $${newPrice}. Este cambio será efectivo para nuevas suscripciones y renovaciones.`,
+        cta_text: null,
+        cta_url: null,
+        expires_at: expiresAt,
+        is_read: false
+      }))
+
+      console.log('📝 Intentando crear notificaciones in-app para:', users.length, 'usuarios')
+      console.log('📝 Notificaciones a insertar:', notifications)
+
+      const { data: notifData, error: notifError } = await supabase
+        .from('notifications')
+        .insert(notifications)
+        .select('id')
+
+      if (notifError) {
+        console.error('❌ Error insertando notificaciones:', notifError)
+      } else {
+        console.log('✅ Notificaciones insertadas:', notifData?.length || 0)
+      }
+
+      if (!notifError && notifData) {
+        results.notifications_created = notifData.length
+      }
+
+      // Enviar emails a cada usuario
+      for (const user of users) {
+        try {
+          const htmlContent = this.createPriceChangeEmail(
+            user.full_name || 'Usuario',
+            newPrice
+          )
+
+          const emailResult = await sendEmail({
+            to: user.email,
+            subject: 'Actualización Importante: Cambio de Precio',
+            html: htmlContent,
+            templateKey: 'price_change',
+            userId: user.id
+          })
+
+          if (emailResult.success) {
+            results.emails_sent++
+          } else {
+            results.errors++
+          }
+
+          // Pausa breve entre envíos
+          await new Promise(resolve => setTimeout(resolve, 100))
+
+        } catch (error) {
+          console.error(`Error enviando notificación a usuario ${user.id}:`, error)
+          results.errors++
+        }
+      }
+
+      return { success: true, data: results, error: null }
+
+    } catch (error) {
+      return {
+        success: false,
+        data: null,
+        error: error instanceof Error ? error.message : 'Error desconocido'
+      }
+    }
+  }
+
+  // Template para email de cambio de precio
+  static createPriceChangeEmail(userName: string, newPrice: string): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Actualización de Precio</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h1 style="color: #2563eb; border-bottom: 3px solid #2563eb; padding-bottom: 10px;">
+              EsteticaProHub
+            </h1>
+            <h2 style="color: #1f2937;">
+              Actualización Importante: Cambio de Precio
+            </h2>
+            <p>Hola ${userName},</p>
+            <div style="background: #fef3c7; padding: 20px; border-left: 4px solid #f59e0b; border-radius: 8px; margin: 20px 0;">
+              <p style="margin: 0; font-weight: 600; color: #92400e;">
+                Te informamos que el precio de suscripción ha sido actualizado a <strong>$${newPrice} USD</strong>.
+              </p>
+            </div>
+            <p>Este cambio será efectivo para:</p>
+            <ul style="color: #4b5563;">
+              <li>Nuevas suscripciones</li>
+              <li>Renovaciones de suscripciones existentes</li>
+            </ul>
+            <p>Si tienes una suscripción activa, el nuevo precio se aplicará en tu próxima fecha de renovación.</p>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+            <p style="color: #6b7280; font-size: 14px;">
+              Gracias por ser parte de nuestra comunidad de profesionales de la estética.
+            </p>
+            <p style="color: #9ca3af; font-size: 12px;">
+              © 2025 EsteticaProHub. Todos los derechos reservados.
+            </p>
+          </div>
+        </body>
+      </html>
+    `
+  }
 }
