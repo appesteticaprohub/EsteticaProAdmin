@@ -47,7 +47,8 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
         { id: 'notifications-broadcast', name: 'Broadcast Masivo', icon: '📢' },
         { id: 'notifications-newsletter', name: 'Newsletter', icon: '📰' },
         { id: 'notifications-templates', name: 'Templates', icon: '📝' },
-        { id: 'notifications-logs', name: 'Logs', icon: '📋' }
+        { id: 'notifications-logs', name: 'Logs', icon: '📋' },
+        { id: 'notifications-cleanup', name: 'Limpieza', icon: '🗑️' }
       ]
     }
   ]

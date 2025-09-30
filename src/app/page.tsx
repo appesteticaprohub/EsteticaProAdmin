@@ -10,6 +10,7 @@ import BroadcastComposer from '@/components/BroadcastComposer'
 import NewsletterPanel from '@/components/NewsletterPanel'
 import TemplateManager from '@/components/TemplateManager'
 import NotificationLogs from '@/components/NotificationLogs'
+import NotificationCleanup from '@/components/NotificationCleanup'
 
 export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState('dashboard')
@@ -32,6 +33,8 @@ export default function AdminDashboard() {
         return <TemplateManager />
       case 'notifications-logs':
         return <NotificationLogs />
+      case 'notifications-cleanup':
+        return <NotificationCleanup />
       default:
         return <DashboardStats />
     }
