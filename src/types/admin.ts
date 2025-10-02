@@ -211,3 +211,40 @@ export interface AdminStats {
   activeNotifications: number
   newsletterSubscribers: number
 }
+
+// Tipos para sistema de gestión de imágenes
+export interface ImageSettings {
+  max_images_per_post: number
+  max_image_size_mb: number
+  allowed_formats: string[]
+  compression_quality: number
+  max_width: number
+  max_height: number
+}
+
+export interface StorageStats {
+  total_images: number
+  storage_used_mb: number
+  storage_used_gb: number
+  images_this_month: number
+  images_this_week: number
+  average_images_per_post: number
+  top_uploaders: Array<{
+    user_id: string
+    user_name: string
+    image_count: number
+  }>
+  monthly_trend: Array<{
+    month: string
+    count: number
+  }>
+}
+
+export interface ImageSettingsUpdateRequest {
+  max_images_per_post?: number
+  max_image_size_mb?: number
+  allowed_formats?: string[]
+  compression_quality?: number
+  max_width?: number
+  max_height?: number
+}

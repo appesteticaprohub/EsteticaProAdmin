@@ -11,6 +11,8 @@ import NewsletterPanel from '@/components/NewsletterPanel'
 import TemplateManager from '@/components/TemplateManager'
 import NotificationLogs from '@/components/NotificationLogs'
 import NotificationCleanup from '@/components/NotificationCleanup'
+import ImageSettingsPanel from '@/components/ImageSettingsPanel'
+import StorageStatsPanel from '@/components/StorageStatsPanel'
 
 export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState('dashboard')
@@ -35,6 +37,13 @@ export default function AdminDashboard() {
         return <NotificationLogs />
       case 'notifications-cleanup':
         return <NotificationCleanup />
+        case 'images':
+        return (
+          <div className="space-y-6">
+            <ImageSettingsPanel />
+            <StorageStatsPanel />
+          </div>
+        )
       default:
         return <DashboardStats />
     }

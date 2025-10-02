@@ -39,6 +39,11 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
       icon: '💰'
     },
     {
+      id: 'images',
+      name: 'Gestión de Imágenes',
+      icon: '🖼️'
+    },
+    {
       id: 'notifications',
       name: 'Notificaciones',
       icon: '🔔',
