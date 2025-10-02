@@ -112,3 +112,45 @@ export async function verifyPayPalSubscription(subscriptionId: string) {
 
   return response.json();
 }
+
+// Cancelar suscripción de PayPal (para baneo de usuarios)
+export async function cancelPayPalSubscription(subscriptionId: string, reason: string = 'User banned by administrator') {
+  try {
+    const accessToken = await getPayPalAccessToken();
+    
+    const response = await fetch(`${PAYPAL_BASE_URL}/v1/billing/subscriptions/${subscriptionId}/cancel`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        reason: reason
+      }),
+    });
+
+    // PayPal retorna 204 No Content en éxito
+    if (response.status === 204) {
+      return {
+        success: true,
+        status: 204,
+        message: 'Subscription cancelled successfully'
+      };
+    }
+
+    // Si no es 204, algo salió mal
+    const errorText = await response.text();
+    return {
+      success: false,
+      status: response.status,
+      error: errorText || 'Failed to cancel subscription'
+    };
+
+  } catch (error) {
+    console.error('Error cancelling PayPal subscription:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}

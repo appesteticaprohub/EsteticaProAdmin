@@ -240,6 +240,114 @@ export interface StorageStats {
   }>
 }
 
+// Tipos para sistema de moderación y baneo
+export interface BanUserRequest {
+  reason: string
+  admin_id: string
+}
+
+export interface BanUserResponse {
+  success: boolean
+  user_id: string
+  paypal_cancelled: boolean
+  error?: string
+}
+
+export interface UnbanUserRequest {
+  admin_id: string
+  reason?: string
+}
+
+export interface ModerationLog {
+  id: string
+  admin_id: string
+  action_type: 'ban_user' | 'unban_user' | 'delete_post' | 'delete_comment' | 'approve_post'
+  target_type: 'user' | 'post' | 'comment'
+  target_id: string
+  reason: string | null
+  metadata: any
+  created_at: string
+}
+
+export interface PostWithAuthor extends Post {
+  author: {
+    id: string
+    full_name: string | null
+    email: string
+    country: string | null
+    specialty: string | null
+    user_type: string
+    subscription_status: string
+    is_banned: boolean
+    created_at: string
+  }
+  images: string[]
+  is_reviewed: boolean
+  reviewed_at: string | null
+  reviewed_by: string | null
+}
+
+export interface CommentWithUser extends Comment {
+  user: {
+    id: string
+    full_name: string | null
+    email: string
+    is_banned: boolean
+  }
+  reviewed_at: string | null
+  reviewed_by: string | null
+}
+
+export interface UserStats {
+  total_posts: number
+  total_comments: number
+  deleted_posts: number
+  deleted_comments: number
+  ban_history: Array<{
+    banned_at: string
+    banned_reason: string
+    unbanned_at: string | null
+  }>
+}
+
+export interface ProfileWithStats extends Profile {
+  is_banned: boolean
+  banned_at: string | null
+  banned_reason: string | null
+  banned_by: string | null
+  paypal_subscription_id: string | null
+  stats?: UserStats
+}
+
+export interface ModerationStats {
+  posts: {
+    total: number
+    today: number
+    this_week: number
+    this_month: number
+    deleted_today: number
+    deleted_week: number
+    deleted_month: number
+    pending_review: number
+  }
+  comments: {
+    total: number
+    today: number
+    this_week: number
+    this_month: number
+    deleted_today: number
+    deleted_week: number
+    deleted_month: number
+  }
+  users: {
+    total_active: number
+    total_banned: number
+    banned_today: number
+    banned_week: number
+    banned_month: number
+  }
+}
+
 export interface ImageSettingsUpdateRequest {
   max_images_per_post?: number
   max_image_size_mb?: number
