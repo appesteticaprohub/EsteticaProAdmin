@@ -285,6 +285,8 @@ export interface PostWithAuthor extends Post {
   is_reviewed: boolean
   reviewed_at: string | null
   reviewed_by: string | null
+  is_deleted: boolean
+  deleted_at: string | null
 }
 
 export interface CommentWithUser extends Comment {

@@ -51,7 +51,7 @@ export async function GET(
     // 2. Obtener todos los posts del usuario
     const { data: posts } = await supabase
       .from('posts')
-      .select('id, title, content, created_at, views_count, likes_count, comments_count, category, images, is_reviewed')
+      .select('id, title, content, created_at, views_count, likes_count, comments_count, category, images, is_reviewed, is_deleted, deleted_at')
       .eq('author_id', userId)
       .order('created_at', { ascending: false })
 
@@ -87,6 +87,7 @@ export async function GET(
     const stats = {
       total_posts: posts?.length || 0,
       total_comments: comments?.length || 0,
+      deleted_posts: posts?.filter((p: any) => p.is_deleted).length || 0,
       deleted_comments: comments?.filter((c: any) => c.is_deleted).length || 0,
       active_comments: comments?.filter((c: any) => !c.is_deleted).length || 0,
       total_views: posts?.reduce((sum: number, p: any) => sum + (p.views_count || 0), 0) || 0,

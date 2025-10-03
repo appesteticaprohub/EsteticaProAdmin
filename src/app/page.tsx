@@ -13,6 +13,7 @@ import NotificationLogs from '@/components/NotificationLogs'
 import NotificationCleanup from '@/components/NotificationCleanup'
 import ImageSettingsPanel from '@/components/ImageSettingsPanel'
 import StorageStatsPanel from '@/components/StorageStatsPanel'
+import BannedUsersPanel from '@/components/BannedUsersPanel'
 
 export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState('dashboard')
@@ -44,6 +45,8 @@ export default function AdminDashboard() {
             <StorageStatsPanel />
           </div>
         )
+        case 'moderation-banned':
+        return <BannedUsersPanel />
       default:
         return <DashboardStats />
     }

@@ -9,8 +9,15 @@ export async function POST(
 ) {
   try {
     const { id: userId } = await params
-    const body: UnbanUserRequest = await request.json()
-    const { reason } = body
+    // El body es opcional para unban
+    let reason: string | undefined
+    try {
+      const body: UnbanUserRequest = await request.json()
+      reason = body.reason
+    } catch {
+      // Si no hay body, continuamos sin razón
+      reason = undefined
+    }
 
     // Obtener admin_id de la sesión autenticada
     const supabaseAuth = await createServerSupabaseClient()
@@ -89,7 +96,7 @@ export async function POST(
         action_type: 'unban_user',
         target_type: 'user',
         target_id: userId,
-        reason: reason || 'User unbanned by administrator',
+        reason: reason || 'User unbanned - No reason provided',
         metadata: {
           user_email: user.email,
           user_name: user.full_name,
