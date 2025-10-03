@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
+import { createServerSupabaseClient } from '@/lib/server-supabase'
 import type { UnbanUserRequest } from '@/types/admin'
 
 export async function POST(
@@ -9,15 +10,34 @@ export async function POST(
   try {
     const { id: userId } = await params
     const body: UnbanUserRequest = await request.json()
-    const { admin_id, reason } = body
+    const { reason } = body
 
-    // Validación básica
-    if (!admin_id) {
+    // Obtener admin_id de la sesión autenticada
+    const supabaseAuth = await createServerSupabaseClient()
+    const { data: { user: adminUser }, error: authError } = await supabaseAuth.auth.getUser()
+
+    if (authError || !adminUser) {
       return NextResponse.json(
-        { success: false, error: 'Admin ID is required' },
-        { status: 400 }
+        { success: false, error: 'Unauthorized - No active session' },
+        { status: 401 }
       )
     }
+
+    // Verificar que el usuario autenticado es admin
+    const { data: adminProfile, error: adminError } = await supabaseAuth
+      .from('profiles')
+      .select('role')
+      .eq('id', adminUser.id)
+      .single()
+
+    if (adminError || !adminProfile || adminProfile.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden - Admin access required' },
+        { status: 403 }
+      )
+    }
+
+    const admin_id = adminUser.id
 
     const supabase = createServerSupabaseAdminClient()
 

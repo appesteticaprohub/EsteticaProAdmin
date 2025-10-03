@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
+import { createServerSupabaseClient } from '@/lib/server-supabase'
 
 interface DeletePostRequest {
-  admin_id: string
   reason: string
 }
 
@@ -13,15 +13,34 @@ export async function POST(
   try {
     const { id: postId } = await params
     const body: DeletePostRequest = await request.json()
-    const { admin_id, reason } = body
+    const { reason } = body
 
-    // Validaciones
-    if (!admin_id) {
+    // Obtener admin_id de la sesión autenticada
+    const supabaseAuth = await createServerSupabaseClient()
+    const { data: { user: adminUser }, error: authError } = await supabaseAuth.auth.getUser()
+
+    if (authError || !adminUser) {
       return NextResponse.json(
-        { success: false, error: 'Admin ID is required' },
-        { status: 400 }
+        { success: false, error: 'Unauthorized - No active session' },
+        { status: 401 }
       )
     }
+
+    // Verificar que el usuario autenticado es admin
+    const { data: adminProfile, error: adminError } = await supabaseAuth
+      .from('profiles')
+      .select('role')
+      .eq('id', adminUser.id)
+      .single()
+
+    if (adminError || !adminProfile || adminProfile.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden - Admin access required' },
+        { status: 403 }
+      )
+    }
+
+    const admin_id = adminUser.id
 
     if (!reason || reason.trim().length === 0) {
       return NextResponse.json(

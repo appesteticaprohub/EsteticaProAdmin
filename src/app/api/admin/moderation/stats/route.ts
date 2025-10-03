@@ -1,8 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
+import { createServerSupabaseClient } from '@/lib/server-supabase'
+
 
 export async function GET(request: NextRequest) {
   try {
+    // Verificar que el usuario autenticado es admin
+    const supabaseAuth = await createServerSupabaseClient()
+    const { data: { user: adminUser }, error: authError } = await supabaseAuth.auth.getUser()
+
+    if (authError || !adminUser) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - No active session' },
+        { status: 401 }
+      )
+    }
+
+    const { data: adminProfile, error: adminError } = await supabaseAuth
+      .from('profiles')
+      .select('role')
+      .eq('id', adminUser.id)
+      .single()
+
+    if (adminError || !adminProfile || adminProfile.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden - Admin access required' },
+        { status: 403 }
+      )
+    }
+
     const supabase = createServerSupabaseAdminClient()
 
     // Obtener fechas para filtros temporales
