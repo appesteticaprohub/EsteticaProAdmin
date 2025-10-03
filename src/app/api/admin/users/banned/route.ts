@@ -48,6 +48,11 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact' })
       .eq('is_banned', true)
 
+    // Filtro de búsqueda por nombre o email
+    if (search) {
+      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`)
+    }
+
     // Filtro por rango de fechas de baneo
     if (dateFrom) {
       query = query.gte('banned_at', dateFrom)
@@ -63,7 +68,39 @@ export async function GET(request: NextRequest) {
     // Paginación
     query = query.range(offset, offset + limit - 1)
 
-    const { data: users, error, count } = await query
+    // Primero ejecutar query sin paginación para obtener el count
+    const { count: totalCount, error: countError } = await supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_banned', true)
+
+    if (countError) {
+      console.error('Error counting banned users:', countError)
+      return NextResponse.json(
+        { success: false, error: 'Failed to count banned users' },
+        { status: 500 }
+      )
+    }
+
+    // Si la página solicitada está fuera de rango, retornar vacío
+    const totalPages = Math.ceil((totalCount || 0) / limit)
+    if (page > totalPages && totalPages > 0) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        pagination: {
+          current_page: page,
+          total_pages: totalPages,
+          total_records: totalCount || 0,
+          limit: limit,
+          has_next: false,
+          has_prev: page > 1
+        }
+      })
+    }
+
+    // Ahora sí ejecutar la query con paginación
+    const { data: users, error } = await query
 
     if (error) {
       console.error('Error fetching banned users:', error)
@@ -73,63 +110,80 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Filtrar por búsqueda después de la query
-    let filteredUsers = users || []
-
-    if (search) {
-      const searchLower = search.toLowerCase()
-      filteredUsers = filteredUsers.filter((user: any) =>
-        user.full_name?.toLowerCase().includes(searchLower) ||
-        user.email?.toLowerCase().includes(searchLower)
-      )
+    // Si no hay usuarios en esta página, retornar respuesta vacía válida
+    if (!users || users.length === 0) {
+      
+      return NextResponse.json({
+        success: true,
+        data: [],
+        pagination: {
+          current_page: page,
+          total_pages: totalPages,
+          total_records: totalCount || 0,
+          limit: limit,
+          has_next: page < totalPages,
+          has_prev: page > 1
+        }
+      })
     }
 
     // Para cada usuario banneado, obtener info adicional
     const usersWithDetails = await Promise.all(
-      filteredUsers.map(async (user: any) => {
-        // Obtener info del admin que banneó
-        let bannedByAdmin = null
-        if (user.banned_by) {
-          const { data: admin } = await supabase
-            .from('profiles')
-            .select('id, full_name, email')
-            .eq('id', user.banned_by)
-            .single()
-          
-          bannedByAdmin = admin
-        }
+      users.map(async (user: any) => {
+        try {
+          // Obtener info del admin que banneó
+          let bannedByAdmin = null
+          if (user.banned_by) {
+            const { data: admin } = await supabase
+              .from('profiles')
+              .select('id, full_name, email')
+              .eq('id', user.banned_by)
+              .maybeSingle()
+            
+            bannedByAdmin = admin
+          }
 
-        // Obtener estadísticas
-        const { count: totalPosts } = await supabase
-          .from('posts')
-          .select('*', { count: 'exact', head: true })
-          .eq('author_id', user.id)
+          // Obtener estadísticas
+          const { count: totalPosts } = await supabase
+            .from('posts')
+            .select('*', { count: 'exact', head: true })
+            .eq('author_id', user.id)
 
-        const { count: totalComments } = await supabase
-          .from('comments')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
+          const { count: totalComments } = await supabase
+            .from('comments')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
 
-        const { count: deletedComments } = await supabase
-          .from('comments')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('is_deleted', true)
+          const { count: deletedComments } = await supabase
+            .from('comments')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('is_deleted', true)
 
-        return {
-          ...user,
-          banned_by_admin: bannedByAdmin,
-          stats: {
-            total_posts: totalPosts || 0,
-            total_comments: totalComments || 0,
-            deleted_comments: deletedComments || 0
+          return {
+            ...user,
+            banned_by_admin: bannedByAdmin,
+            stats: {
+              total_posts: totalPosts || 0,
+              total_comments: totalComments || 0,
+              deleted_comments: deletedComments || 0
+            }
+          }
+        } catch (err) {
+          console.error(`Error fetching details for user ${user.id}:`, err)
+          // Si falla, retornar el usuario sin detalles adicionales
+          return {
+            ...user,
+            banned_by_admin: null,
+            stats: {
+              total_posts: 0,
+              total_comments: 0,
+              deleted_comments: 0
+            }
           }
         }
       })
     )
-
-    // Calcular paginación
-    const totalPages = Math.ceil((count || 0) / limit)
 
     return NextResponse.json({
       success: true,
@@ -137,7 +191,7 @@ export async function GET(request: NextRequest) {
       pagination: {
         current_page: page,
         total_pages: totalPages,
-        total_records: count || 0,
+        total_records: totalCount || 0,
         limit: limit,
         has_next: page < totalPages,
         has_prev: page > 1

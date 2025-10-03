@@ -2,6 +2,15 @@
 
 import { useState, useEffect } from 'react'
 
+interface PaginationInfo {
+  current_page: number
+  total_pages: number
+  total_records: number
+  limit: number
+  has_next: boolean
+  has_prev: boolean
+}
+
 interface BannedUser {
   id: string
   full_name: string | null
@@ -16,8 +25,10 @@ interface BannedUser {
 import UserHistoryModal from './UserHistoryModal'
 
 interface ApiResponse {
+  success: boolean
   data: BannedUser[] | null
-  error: string | null
+  error?: string | null
+  pagination?: PaginationInfo
 }
 
 export default function BannedUsersPanel() {
@@ -28,17 +39,30 @@ export default function BannedUsersPanel() {
   const [showHistoryModal, setShowHistoryModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<BannedUser | null>(null)
 
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    current_page: 1,
+    total_pages: 1,
+    total_records: 0,
+    limit: 20,
+    has_next: false,
+    has_prev: false
+  })
+  const [currentPage, setCurrentPage] = useState(1)
 
-  const fetchBannedUsers = async () => {
+
+  const fetchBannedUsers = async (page: number = 1) => {
     try {
       setLoading(true)
-      const response = await fetch('/api/admin/users/banned')
+      const response = await fetch(`/api/admin/users/banned?page=${page}&limit=20`)
       const result: ApiResponse = await response.json()
       
-      if (result.error) {
-        setError(result.error)
+      if (!result.success || result.error) {
+        setError(result.error || 'Error desconocido')
       } else {
         setBannedUsers(result.data || [])
+        if (result.pagination) {
+          setPagination(result.pagination)
+        }
       }
     } catch (err) {
       setError('Error al cargar usuarios banneados')
@@ -48,8 +72,8 @@ export default function BannedUsersPanel() {
   }
 
   useEffect(() => {
-    fetchBannedUsers()
-  }, [])
+    fetchBannedUsers(currentPage)
+  }, [currentPage])
 
   const handleUnban = async (userId: string) => {
     if (!confirm('¿Estás seguro de que deseas desbanear a este usuario?')) {
@@ -68,8 +92,8 @@ export default function BannedUsersPanel() {
         alert(`Error: ${result.error}`)
       } else {
         alert('Usuario desbaneado exitosamente')
-        // Recargar la lista
-        await fetchBannedUsers()
+        // Recargar la lista en la página actual
+        await fetchBannedUsers(currentPage)
       }
     } catch (err) {
       alert('Error al desbanear usuario')
@@ -136,9 +160,15 @@ export default function BannedUsersPanel() {
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">
-              Usuarios Suspendidos ({bannedUsers.length})
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium text-gray-900">
+                Usuarios Suspendidos
+              </h3>
+              <p className="text-sm text-gray-600">
+                Mostrando {((currentPage - 1) * pagination.limit) + 1}-
+                {Math.min(currentPage * pagination.limit, pagination.total_records)} de {pagination.total_records} resultados
+              </p>
+            </div>
           </div>
           
           <div className="divide-y divide-gray-200">
@@ -241,8 +271,34 @@ export default function BannedUsersPanel() {
               </div>
             ))}
           </div>
+
+          {/* Controles de paginación */}
+          {pagination.total_pages > 1 && (
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+              <div className="text-sm text-gray-700">
+                Página {pagination.current_page} de {pagination.total_pages}
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setCurrentPage(prev => prev - 1)}
+                  disabled={!pagination.has_prev}
+                  className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  ← Anterior
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                  disabled={!pagination.has_next}
+                  className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  Siguiente →
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
+
       {/* Modal de historial */}
       {selectedUser && (
         <UserHistoryModal
