@@ -165,8 +165,7 @@ export default function BannedUsersPanel() {
                 Usuarios Suspendidos
               </h3>
               <p className="text-sm text-gray-600">
-                Mostrando {((currentPage - 1) * pagination.limit) + 1}-
-                {Math.min(currentPage * pagination.limit, pagination.total_records)} de {pagination.total_records} resultados
+                Mostrando usuarios {((currentPage - 1) * pagination.limit) + 1} al {Math.min(currentPage * pagination.limit, pagination.total_records)} de un total de {pagination.total_records}
               </p>
             </div>
           </div>

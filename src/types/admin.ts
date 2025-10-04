@@ -350,6 +350,34 @@ export interface ModerationStats {
   }
 }
 
+export interface UserHistoryPagination {
+  posts: {
+    current_page: number
+    total_pages: number
+    total_items: number
+    items_per_page: number
+    has_next: boolean
+    has_prev: boolean
+  }
+  comments: {
+    current_page: number
+    total_pages: number
+    total_items: number
+    items_per_page: number
+    has_next: boolean
+    has_prev: boolean
+  }
+}
+
+export interface UserHistoryResponse {
+  user: ProfileWithStats
+  posts: PostWithAuthor[]
+  comments: CommentWithUser[]
+  moderation_history: ModerationLog[]
+  stats: UserStats
+  pagination: UserHistoryPagination
+}
+
 export interface ImageSettingsUpdateRequest {
   max_images_per_post?: number
   max_image_size_mb?: number

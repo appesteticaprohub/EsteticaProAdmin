@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { PostWithAuthor, CommentWithUser } from '@/types/admin'
+import { PostWithAuthor, CommentWithUser, UserHistoryResponse, UserHistoryPagination } from '@/types/admin'
 
 interface UserHistoryModalProps {
   isOpen: boolean
@@ -20,6 +20,7 @@ interface UserHistory {
     deleted_posts: number
     deleted_comments: number
   }
+  pagination: UserHistoryPagination
 }
 
 export default function UserHistoryModal({
@@ -33,18 +34,28 @@ export default function UserHistoryModal({
   const [history, setHistory] = useState<UserHistory | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [postsPage, setPostsPage] = useState(1)
+  const [commentsPage, setCommentsPage] = useState(1)
+  const postsLimit = 10
+  const commentsLimit = 10
 
   useEffect(() => {
     if (isOpen && userId) {
       fetchUserHistory()
     }
-  }, [isOpen, userId])
+  }, [isOpen, userId, postsPage, commentsPage])
 
   const fetchUserHistory = async () => {
     try {
       setLoading(true)
       setError(null)
-      const response = await fetch(`/api/admin/users/${userId}/history`)
+      const params = new URLSearchParams({
+        posts_page: postsPage.toString(),
+        posts_limit: postsLimit.toString(),
+        comments_page: commentsPage.toString(),
+        comments_limit: commentsLimit.toString()
+      })
+      const response = await fetch(`/api/admin/users/${userId}/history?${params}`)
       const result = await response.json()
 
       if (result.error) {
@@ -56,6 +67,30 @@ export default function UserHistoryModal({
       setError('Error al cargar el historial del usuario')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handlePostsNextPage = () => {
+    if (history?.pagination.posts.has_next) {
+      setPostsPage(prev => prev + 1)
+    }
+  }
+
+  const handlePostsPrevPage = () => {
+    if (history?.pagination.posts.has_prev) {
+      setPostsPage(prev => prev - 1)
+    }
+  }
+
+  const handleCommentsNextPage = () => {
+    if (history?.pagination.comments.has_next) {
+      setCommentsPage(prev => prev + 1)
+    }
+  }
+
+  const handleCommentsPrevPage = () => {
+    if (history?.pagination.comments.has_prev) {
+      setCommentsPage(prev => prev - 1)
     }
   }
 
@@ -161,53 +196,81 @@ export default function UserHistoryModal({
                         Este usuario no ha publicado posts
                       </div>
                     ) : (
-                      history.posts.map((post) => (
-                        <div
-                          key={post.id}
-                          className={`border rounded-lg p-4 ${
-                            post.is_deleted 
-                              ? 'bg-red-50 border-red-200' 
-                              : 'bg-white border-gray-200'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1">
-                              <h4 className={`font-semibold break-words ${
-                                post.is_deleted ? 'line-through text-gray-500' : 'text-gray-900'
-                              }`}>
-                                {post.title}
-                              </h4>
-                              <p className="text-sm text-gray-600 mt-1">
-                                {post.category || 'Sin categoría'}
-                              </p>
-                            </div>
-                            {post.is_deleted && (
-                              <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-medium">
-                                Eliminado
-                              </span>
-                            )}
-                          </div>
-                          
-                          <p className={`text-sm mb-3 break-words overflow-hidden ${
-                            post.is_deleted ? 'text-gray-500' : 'text-gray-700'
-                          }`}>
-                            {post.content.substring(0, 100)}
-                            {post.content.length > 100 && '...'}
-                          </p>
-                          
-                          <div className="flex items-center justify-between text-xs text-gray-500">
-                            <span>{formatDate(post.created_at)}</span>
-                            <div className="flex items-center space-x-3">
-                              <span>👁️ {post.views_count}</span>
-                              <span>❤️ {post.likes_count}</span>
-                              <span>💬 {post.comments_count}</span>
-                              {post.images && post.images.length > 0 && (
-                                <span>📷 {post.images.length}</span>
+                      <>
+                        {/* Posts list */}
+                        {history.posts.map((post) => (
+                          <div
+                            key={post.id}
+                            className={`border rounded-lg p-4 ${
+                              post.is_deleted 
+                                ? 'bg-red-50 border-red-200' 
+                                : 'bg-white border-gray-200'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <h4 className={`font-semibold break-words ${
+                                  post.is_deleted ? 'line-through text-gray-500' : 'text-gray-900'
+                                }`}>
+                                  {post.title}
+                                </h4>
+                                <p className="text-sm text-gray-600 mt-1">
+                                  {post.category || 'Sin categoría'}
+                                </p>
+                              </div>
+                              {post.is_deleted && (
+                                <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-medium">
+                                  Eliminado
+                                </span>
                               )}
                             </div>
+                            
+                            <p className={`text-sm mb-3 break-words overflow-hidden ${
+                              post.is_deleted ? 'text-gray-500' : 'text-gray-700'
+                            }`}>
+                              {post.content.substring(0, 100)}
+                              {post.content.length > 100 && '...'}
+                            </p>
+                            
+                            <div className="flex items-center justify-between text-xs text-gray-500">
+                              <span>{formatDate(post.created_at)}</span>
+                              <div className="flex items-center space-x-3">
+                                <span>👁️ {post.views_count}</span>
+                                <span>❤️ {post.likes_count}</span>
+                                <span>💬 {post.comments_count}</span>
+                                {post.images && post.images.length > 0 && (
+                                  <span>📷 {post.images.length}</span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        ))}
+
+                        {/* Paginación Posts */}
+                        {history.pagination.posts.total_pages > 1 && (
+                          <div className="flex items-center justify-between pt-4 border-t">
+                            <div className="text-sm text-gray-600">
+                              Mostrando {((history.pagination.posts.current_page - 1) * postsLimit) + 1} - {Math.min(history.pagination.posts.current_page * postsLimit, history.pagination.posts.total_items)} de {history.pagination.posts.total_items} posts
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={handlePostsPrevPage}
+                                disabled={!history.pagination.posts.has_prev}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                              >
+                                Anterior
+                              </button>
+                              <button
+                                onClick={handlePostsNextPage}
+                                disabled={!history.pagination.posts.has_next}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                              >
+                                Siguiente
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -220,37 +283,65 @@ export default function UserHistoryModal({
                         Este usuario no ha realizado comentarios
                       </div>
                     ) : (
-                      history.comments.map((comment) => (
-                        <div
-                          key={comment.id}
-                          className={`border rounded-lg p-4 ${
-                            comment.is_deleted
-                              ? 'bg-red-50 border-red-200'
-                              : 'bg-white border-gray-200'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between mb-2">
-                            <p className={`text-sm flex-1 break-words overflow-hidden ${
-                              comment.is_deleted ? 'line-through text-gray-500' : 'text-gray-700'
-                            }`}>
-                              {comment.content.substring(0, 150)}
-                              {comment.content.length > 150 && '...'}
-                            </p>
-                            {comment.is_deleted && (
-                              <span className="ml-2 px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-medium flex-shrink-0">
-                                Eliminado
-                              </span>
-                            )}
+                      <>
+                        {/* Comments list */}
+                        {history.comments.map((comment) => (
+                          <div
+                            key={comment.id}
+                            className={`border rounded-lg p-4 ${
+                              comment.is_deleted
+                                ? 'bg-red-50 border-red-200'
+                                : 'bg-white border-gray-200'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <p className={`text-sm flex-1 break-words overflow-hidden ${
+                                comment.is_deleted ? 'line-through text-gray-500' : 'text-gray-700'
+                              }`}>
+                                {comment.content.substring(0, 150)}
+                                {comment.content.length > 150 && '...'}
+                              </p>
+                              {comment.is_deleted && (
+                                <span className="ml-2 px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-medium flex-shrink-0">
+                                  Eliminado
+                                </span>
+                              )}
+                            </div>
+                            
+                            <div className="flex items-center justify-between text-xs text-gray-500">
+                              <span>{formatDate(comment.created_at)}</span>
+                              {comment.parent_id && (
+                                <span className="text-blue-600">↳ Respuesta</span>
+                              )}
+                            </div>
                           </div>
-                          
-                          <div className="flex items-center justify-between text-xs text-gray-500">
-                            <span>{formatDate(comment.created_at)}</span>
-                            {comment.parent_id && (
-                              <span className="text-blue-600">↳ Respuesta</span>
-                            )}
+                        ))}
+
+                        {/* Paginación Comentarios */}
+                        {history.pagination.comments.total_pages > 1 && (
+                          <div className="flex items-center justify-between pt-4 border-t">
+                            <div className="text-sm text-gray-600">
+                              Mostrando {((history.pagination.comments.current_page - 1) * commentsLimit) + 1} - {Math.min(history.pagination.comments.current_page * commentsLimit, history.pagination.comments.total_items)} de {history.pagination.comments.total_items} comentarios
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={handleCommentsPrevPage}
+                                disabled={!history.pagination.comments.has_prev}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                              >
+                                Anterior
+                              </button>
+                              <button
+                                onClick={handleCommentsNextPage}
+                                disabled={!history.pagination.comments.has_next}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                              >
+                                Siguiente
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        )}
+                      </>
                     )}
                   </div>
                 )}

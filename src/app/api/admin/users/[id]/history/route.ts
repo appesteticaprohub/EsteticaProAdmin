@@ -32,6 +32,16 @@ export async function GET(
     }
 
     const { id: userId } = await params
+    // Extraer query params para paginación
+    const { searchParams } = new URL(request.url)
+    const postsPage = parseInt(searchParams.get('posts_page') || '1')
+    const postsLimit = parseInt(searchParams.get('posts_limit') || '10')
+    const commentsPage = parseInt(searchParams.get('comments_page') || '1')
+    const commentsLimit = parseInt(searchParams.get('comments_limit') || '10')
+
+    // Calcular offsets
+    const postsOffset = (postsPage - 1) * postsLimit
+    const commentsOffset = (commentsPage - 1) * commentsLimit
     const supabase = createServerSupabaseAdminClient()
 
     // 1. Verificar que el usuario existe
@@ -48,19 +58,21 @@ export async function GET(
       )
     }
 
-    // 2. Obtener todos los posts del usuario
-    const { data: posts } = await supabase
+    // 2. Obtener posts del usuario con paginación
+    const { data: posts, count: totalPosts } = await supabase
       .from('posts')
-      .select('id, title, content, created_at, views_count, likes_count, comments_count, category, images, is_reviewed, is_deleted, deleted_at')
+      .select('id, title, content, created_at, views_count, likes_count, comments_count, category, images, is_reviewed, is_deleted, deleted_at', { count: 'exact' })
       .eq('author_id', userId)
       .order('created_at', { ascending: false })
+      .range(postsOffset, postsOffset + postsLimit - 1)
 
-    // 3. Obtener todos los comentarios del usuario
-    const { data: comments } = await supabase
+    // 3. Obtener comentarios del usuario con paginación
+    const { data: comments, count: totalComments } = await supabase
       .from('comments')
-      .select('id, content, post_id, created_at, is_deleted, deleted_at')
+      .select('id, content, post_id, parent_id, created_at, is_deleted, deleted_at', { count: 'exact' })
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
+      .range(commentsOffset, commentsOffset + commentsLimit - 1)
 
     // 4. Obtener historial de moderación sobre este usuario
     const { data: moderationLogs } = await supabase
@@ -83,17 +95,47 @@ export async function GET(
       admin: admins?.find((a: any) => a.id === log.admin_id) || null
     })) || []
 
-    // 6. Calcular estadísticas
+    // 6. Calcular estadísticas globales (no paginadas)
+    // Contar posts eliminados
+    const { count: deletedPostsCount } = await supabase
+      .from('posts')
+      .select('*', { count: 'exact', head: true })
+      .eq('author_id', userId)
+      .eq('is_deleted', true)
+
+    // Contar comentarios eliminados
+    const { count: deletedCommentsCount } = await supabase
+      .from('comments')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_deleted', true)
+
+    // Contar posts revisados
+    const { count: reviewedPostsCount } = await supabase
+      .from('posts')
+      .select('*', { count: 'exact', head: true })
+      .eq('author_id', userId)
+      .eq('is_reviewed', true)
+
+    // Obtener sumas de views y likes (necesitamos los datos completos para esto)
+    const { data: allPostsForStats } = await supabase
+      .from('posts')
+      .select('views_count, likes_count')
+      .eq('author_id', userId)
+
+    const totalViews = allPostsForStats?.reduce((sum: number, p: any) => sum + (p.views_count || 0), 0) || 0
+    const totalLikes = allPostsForStats?.reduce((sum: number, p: any) => sum + (p.likes_count || 0), 0) || 0
+
     const stats = {
-      total_posts: posts?.length || 0,
-      total_comments: comments?.length || 0,
-      deleted_posts: posts?.filter((p: any) => p.is_deleted).length || 0,
-      deleted_comments: comments?.filter((c: any) => c.is_deleted).length || 0,
-      active_comments: comments?.filter((c: any) => !c.is_deleted).length || 0,
-      total_views: posts?.reduce((sum: number, p: any) => sum + (p.views_count || 0), 0) || 0,
-      total_likes: posts?.reduce((sum: number, p: any) => sum + (p.likes_count || 0), 0) || 0,
-      reviewed_posts: posts?.filter((p: any) => p.is_reviewed).length || 0,
-      pending_posts: posts?.filter((p: any) => !p.is_reviewed).length || 0
+      total_posts: totalPosts || 0,
+      total_comments: totalComments || 0,
+      deleted_posts: deletedPostsCount || 0,
+      deleted_comments: deletedCommentsCount || 0,
+      active_comments: (totalComments || 0) - (deletedCommentsCount || 0),
+      total_views: totalViews,
+      total_likes: totalLikes,
+      reviewed_posts: reviewedPostsCount || 0,
+      pending_posts: (totalPosts || 0) - (reviewedPostsCount || 0)
     }
 
     return NextResponse.json({
@@ -103,7 +145,25 @@ export async function GET(
         posts: posts || [],
         comments: comments || [],
         moderation_history: logsWithAdmins,
-        stats: stats
+        stats: stats,
+        pagination: {
+          posts: {
+            current_page: postsPage,
+            total_pages: Math.ceil((totalPosts || 0) / postsLimit),
+            total_items: totalPosts || 0,
+            items_per_page: postsLimit,
+            has_next: postsPage < Math.ceil((totalPosts || 0) / postsLimit),
+            has_prev: postsPage > 1
+          },
+          comments: {
+            current_page: commentsPage,
+            total_pages: Math.ceil((totalComments || 0) / commentsLimit),
+            total_items: totalComments || 0,
+            items_per_page: commentsLimit,
+            has_next: commentsPage < Math.ceil((totalComments || 0) / commentsLimit),
+            has_prev: commentsPage > 1
+          }
+        }
       }
     })
 
