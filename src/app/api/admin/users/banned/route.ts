@@ -68,11 +68,26 @@ export async function GET(request: NextRequest) {
     // Paginación
     query = query.range(offset, offset + limit - 1)
 
-    // Primero ejecutar query sin paginación para obtener el count
-    const { count: totalCount, error: countError } = await supabase
+    // Primero ejecutar query sin paginación para obtener el count (CON FILTROS)
+    let countQuery = supabase
       .from('profiles')
       .select('*', { count: 'exact', head: true })
       .eq('is_banned', true)
+
+    // Aplicar los mismos filtros que la query principal
+    if (search) {
+      countQuery = countQuery.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`)
+    }
+
+    if (dateFrom) {
+      countQuery = countQuery.gte('banned_at', dateFrom)
+    }
+
+    if (dateTo) {
+      countQuery = countQuery.lte('banned_at', dateTo)
+    }
+
+    const { count: totalCount, error: countError } = await countQuery
 
     if (countError) {
       console.error('Error counting banned users:', countError)

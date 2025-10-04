@@ -49,11 +49,39 @@ export default function BannedUsersPanel() {
   })
   const [currentPage, setCurrentPage] = useState(1)
 
+  // Estados para filtros
+  const [searchTerm, setSearchTerm] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [activeFilters, setActiveFilters] = useState({
+    search: '',
+    dateFrom: '',
+    dateTo: ''
+  })
+
 
   const fetchBannedUsers = async (page: number = 1) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/admin/users/banned?page=${page}&limit=20`)
+      
+      // Construir URL con parámetros
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '20'
+      })
+
+      // Agregar filtros activos
+      if (activeFilters.search) {
+        params.append('search', activeFilters.search)
+      }
+      if (activeFilters.dateFrom) {
+        params.append('dateFrom', activeFilters.dateFrom)
+      }
+      if (activeFilters.dateTo) {
+        params.append('dateTo', activeFilters.dateTo)
+      }
+
+      const response = await fetch(`/api/admin/users/banned?${params.toString()}`)
       const result: ApiResponse = await response.json()
       
       if (!result.success || result.error) {
@@ -73,7 +101,7 @@ export default function BannedUsersPanel() {
 
   useEffect(() => {
     fetchBannedUsers(currentPage)
-  }, [currentPage])
+  }, [currentPage, activeFilters])
 
   const handleUnban = async (userId: string) => {
     if (!confirm('¿Estás seguro de que deseas desbanear a este usuario?')) {
@@ -100,6 +128,27 @@ export default function BannedUsersPanel() {
     } finally {
       setActionLoading(null)
     }
+  }
+
+  const handleApplyFilters = () => {
+    setActiveFilters({
+      search: searchTerm,
+      dateFrom: dateFrom,
+      dateTo: dateTo
+    })
+    setCurrentPage(1) // Volver a la primera página al aplicar filtros
+  }
+
+  const handleClearFilters = () => {
+    setSearchTerm('')
+    setDateFrom('')
+    setDateTo('')
+    setActiveFilters({
+      search: '',
+      dateFrom: '',
+      dateTo: ''
+    })
+    setCurrentPage(1)
   }
 
   const formatDate = (dateString: string) => {
@@ -145,6 +194,101 @@ export default function BannedUsersPanel() {
         <p className="text-gray-600 mt-1">
           Lista de usuarios suspendidos de la plataforma
         </p>
+      </div>
+
+      {/* Sección de Filtros */}
+      <div className="bg-white shadow rounded-lg p-6 mb-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Filtros de Búsqueda</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          {/* Búsqueda por nombre/email */}
+          <div>
+            <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
+              Buscar por nombre o email
+            </label>
+            <input
+              id="search"
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Nombre o email..."
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleApplyFilters()
+                }
+              }}
+            />
+          </div>
+
+          {/* Fecha desde */}
+          <div>
+            <label htmlFor="dateFrom" className="block text-sm font-medium text-gray-700 mb-2">
+              Fecha desde
+            </label>
+            <input
+              id="dateFrom"
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Fecha hasta */}
+          <div>
+            <label htmlFor="dateTo" className="block text-sm font-medium text-gray-700 mb-2">
+              Fecha hasta
+            </label>
+            <input
+              id="dateTo"
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        {/* Botones de acción */}
+        <div className="flex space-x-3">
+          <button
+            onClick={handleApplyFilters}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            🔍 Buscar
+          </button>
+          <button
+            onClick={handleClearFilters}
+            className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors font-medium"
+          >
+            ✖️ Limpiar Filtros
+          </button>
+        </div>
+
+        {/* Indicador de filtros activos */}
+        {(activeFilters.search || activeFilters.dateFrom || activeFilters.dateTo) && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm font-medium text-blue-900 mb-2">Filtros activos:</p>
+            <div className="flex flex-wrap gap-2">
+              {activeFilters.search && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  Búsqueda: "{activeFilters.search}"
+                </span>
+              )}
+              {activeFilters.dateFrom && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  Desde: {new Date(activeFilters.dateFrom).toLocaleDateString('es-ES')}
+                </span>
+              )}
+              {activeFilters.dateTo && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  Hasta: {new Date(activeFilters.dateTo).toLocaleDateString('es-ES')}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {bannedUsers.length === 0 ? (
