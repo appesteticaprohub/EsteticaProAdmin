@@ -96,6 +96,36 @@ export default function PostDetailModal({
     }
   }
 
+  const handleRestorePost = async () => {
+    if (!postDetail) return
+
+    if (!confirm('¿Estás seguro de que deseas restaurar este post?')) {
+      return
+    }
+
+    try {
+      setActionLoading(true)
+      const response = await fetch(`/api/admin/moderation/posts/${postId}/restore`, {
+        method: 'POST'
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        alert('Post restaurado exitosamente')
+        fetchPostDetail() // Recargar datos
+        onPostUpdated?.()
+      } else {
+        alert('Error al restaurar el post: ' + (result.error || 'Error desconocido'))
+      }
+    } catch (err) {
+      alert('Error al restaurar el post')
+      console.error(err)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   const handleApprovePost = async () => {
     if (!postDetail) return
 
@@ -441,7 +471,17 @@ export default function PostDetailModal({
             {!loading && !error && postDetail && (
               <div className="bg-gray-50 px-6 py-4 rounded-b-lg flex justify-between items-center flex-shrink-0">
                 <div className="flex gap-3">
-                  {!postDetail.post.is_deleted && (
+                  {postDetail.post.is_deleted ? (
+                    // Si el post está eliminado, mostrar solo botón de restaurar
+                    <button
+                      onClick={handleRestorePost}
+                      disabled={actionLoading}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                    >
+                      ♻️ Restaurar Post
+                    </button>
+                  ) : (
+                    // Si el post NO está eliminado, mostrar botones normales
                     <>
                       <button
                         onClick={handleDeletePost}

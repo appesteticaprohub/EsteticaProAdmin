@@ -261,7 +261,7 @@ export interface UnbanUserRequest {
 export interface ModerationLog {
   id: string
   admin_id: string
-  action_type: 'ban_user' | 'unban_user' | 'delete_post' | 'delete_comment' | 'approve_post'
+  action_type: 'ban_user' | 'unban_user' | 'delete_post' | 'delete_comment' | 'approve_post' | 'restore_post'
   target_type: 'user' | 'post' | 'comment'
   target_id: string
   reason: string | null
