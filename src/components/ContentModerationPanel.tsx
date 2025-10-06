@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { PostsListResponse, PostWithAuthor, PostsFilters, PostsSortOptions } from '@/types/admin'
 import BanUserModal from './BanUserModal'
 import UserHistoryModal from './UserHistoryModal'
+import PostDetailModal from './PostDetailModal'
 
 const CATEGORIES = [
   'Tratamientos Faciales',
@@ -63,6 +64,8 @@ export default function ContentModerationPanel() {
   const [showBanModal, setShowBanModal] = useState(false)
   const [showHistoryModal, setShowHistoryModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<{ id: string; name: string; email: string } | null>(null)
+  const [showPostDetailModal, setShowPostDetailModal] = useState(false)
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
 
   // Fetch posts
   const fetchPosts = async () => {
@@ -173,6 +176,11 @@ export default function ContentModerationPanel() {
   const handleViewHistory = (userId: string, userName: string, userEmail: string) => {
     setSelectedUser({ id: userId, name: userName, email: userEmail })
     setShowHistoryModal(true)
+  }
+
+  const handleViewPostDetail = (postId: string) => {
+    setSelectedPostId(postId)
+    setShowPostDetailModal(true)
   }
 
   const handleConfirmBan = async (reason: string) => {
@@ -525,7 +533,10 @@ export default function ContentModerationPanel() {
                       Bannear Autor
                     </button>
                   )}
-                  <button className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium">
+                  <button 
+                    onClick={() => handleViewPostDetail(post.id)}
+                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                  >
                     Ver Detalles
                   </button>
                 </div>
@@ -566,6 +577,15 @@ export default function ContentModerationPanel() {
           onConfirm={handleConfirmBan}
           userName={selectedUser.name}
           userEmail={selectedUser.email}
+        />
+      )}
+
+      {showPostDetailModal && selectedPostId && (
+        <PostDetailModal
+          isOpen={showPostDetailModal}
+          onClose={() => setShowPostDetailModal(false)}
+          postId={selectedPostId}
+          onPostUpdated={fetchPosts}
         />
       )}
 

@@ -405,6 +405,55 @@ export interface PostsSortOptions {
   sortOrder: 'asc' | 'desc'
 }
 
+// Tipos para PostDetailModal
+export interface PostDetailAuthor {
+  id: string
+  full_name: string | null
+  email: string
+  country: string | null
+  specialty: string | null
+  user_type: string
+  subscription_status: string
+  is_banned: boolean
+  banned_at: string | null
+  banned_reason: string | null
+  created_at: string
+  paypal_subscription_id: string | null
+  stats: {
+    total_posts: number
+    total_comments: number
+    deleted_comments: number
+    ban_history: ModerationLog[]
+  }
+}
+
+export interface PostDetailData {
+  id: string
+  title: string
+  content: string
+  author_id: string
+  created_at: string
+  views_count: number
+  likes_count: number
+  comments_count: number
+  category: string | null
+  images: string[]
+  is_reviewed: boolean
+  reviewed_at: string | null
+  reviewed_by: string | null
+  is_deleted: boolean
+  deleted_at: string | null
+}
+
+export interface PostDetailResponse {
+  success: boolean
+  data: {
+    post: PostDetailData
+    author: PostDetailAuthor
+    comments: CommentWithUser[]
+  }
+}
+
 export interface PostsListResponse {
   success: boolean
   data: PostWithAuthor[]
