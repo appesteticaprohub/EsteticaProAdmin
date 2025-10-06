@@ -483,6 +483,11 @@ export default function ContentModerationPanel() {
                             ELIMINADO
                           </span>
                         )}
+                        {post.is_reviewed && (
+                          <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full flex-shrink-0">
+                            ✓ Revisado
+                          </span>
+                        )}
                       </div>
                       {post.category && (
                         <span className="inline-block px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">
