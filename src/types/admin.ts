@@ -466,3 +466,51 @@ export interface PostsListResponse {
     has_prev: boolean
   }
 }
+
+// Tipos para limpieza de posts eliminados
+export interface DeletedPostsFilters {
+  dateFrom: string
+  dateTo: string
+}
+
+export interface DeletedPostItem {
+  id: string
+  title: string
+  content: string
+  author_id: string
+  author_name: string | null
+  author_email: string
+  deleted_at: string
+  category: string | null
+  images_count: number
+  comments_count: number
+  likes_count: number
+  views_count: number
+  images: string[] // URLs de las imágenes para eliminar del storage
+}
+
+export interface DeletedPostsListResponse {
+  success: boolean
+  data: DeletedPostItem[]
+  total_records: number
+  summary: {
+    total_posts: number
+    total_images: number
+    total_comments: number
+    total_likes: number
+  }
+}
+
+export interface PermanentDeleteRequest {
+  post_ids: string[]
+  admin_id: string
+}
+
+export interface PermanentDeleteResponse {
+  success: boolean
+  deleted_count: number
+  images_deleted: number
+  comments_deleted: number
+  likes_deleted: number
+  errors?: string[]
+}
