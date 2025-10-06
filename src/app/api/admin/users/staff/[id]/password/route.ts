@@ -4,7 +4,7 @@ import { createServerSupabaseAdminClient, createServerSupabaseClient } from '@/l
 // PATCH - Actualizar contraseña de usuario staff
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verificar que el usuario autenticado es admin
@@ -32,7 +32,7 @@ export async function PATCH(
       )
     }
 
-    const userId = params.id
+    const { id: userId } = await params
 
     // Obtener nueva contraseña del body
     const body = await request.json()

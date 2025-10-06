@@ -4,7 +4,7 @@ import { createServerSupabaseAdminClient, createServerSupabaseClient } from '@/l
 // DELETE - Eliminar usuario staff permanentemente
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verificar que el usuario autenticado es admin
@@ -32,7 +32,7 @@ export async function DELETE(
       )
     }
 
-    const userId = params.id
+    const { id: userId } = await params
 
     // Verificar que el usuario existe y es staff
     const { data: staffUser, error: userError } = await supabase
