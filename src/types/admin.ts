@@ -387,7 +387,6 @@ export interface ImageSettingsUpdateRequest {
   max_height?: number
 }
 
-// Tipos para ContentModerationPanel
 export interface PostsFilters {
   category?: string
   authorEmail?: string
@@ -398,6 +397,7 @@ export interface PostsFilters {
   hasImages?: 'true' | 'false' | 'all'
   authorStatus?: 'active' | 'banned' | 'all'
   isReviewed?: 'true' | 'false' | 'all'
+  showDeleted?: 'true' | 'false' | 'only'
 }
 
 export interface PostsSortOptions {

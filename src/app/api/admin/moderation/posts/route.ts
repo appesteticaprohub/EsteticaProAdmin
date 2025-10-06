@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
     const hasImages = searchParams.get('hasImages')
     const authorStatus = searchParams.get('authorStatus') // 'active', 'banned', 'all'
     const isReviewed = searchParams.get('isReviewed')
+    const showDeleted = searchParams.get('showDeleted') // 'true', 'false', 'only'
 
     const supabase = createServerSupabaseAdminClient()
 
@@ -122,6 +123,16 @@ export async function GET(request: NextRequest) {
     if (shouldFilterByAuthor && authorIds.length > 0) {
       postsQuery = postsQuery.in('author_id', authorIds)
     }
+
+    // Filtro de posts eliminados
+    if (showDeleted === 'false') {
+      // Solo posts activos (no eliminados)
+      postsQuery = postsQuery.eq('is_deleted', false)
+    } else if (showDeleted === 'only') {
+      // Solo posts eliminados
+      postsQuery = postsQuery.eq('is_deleted', true)
+    }
+    // Si showDeleted es 'true' o no está definido, mostrar todos (no aplicar filtro)
 
     // Aplicar resto de filtros
     if (category) {

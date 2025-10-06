@@ -38,7 +38,8 @@ export default function ContentModerationPanel() {
     minComments: '',
     hasImages: 'all',
     authorStatus: 'all',
-    isReviewed: 'all'
+    isReviewed: 'all',
+    showDeleted: 'true'
   })
 
   // Estados de filtros activos (aplicados)
@@ -51,7 +52,8 @@ export default function ContentModerationPanel() {
     minComments: '',
     hasImages: 'all',
     authorStatus: 'all',
-    isReviewed: 'all'
+    isReviewed: 'all',
+    showDeleted: 'true'
   })
 
   // Estados de ordenamiento
@@ -109,6 +111,9 @@ export default function ContentModerationPanel() {
       if (activeFilters.isReviewed && activeFilters.isReviewed !== 'all') {
         params.append('isReviewed', activeFilters.isReviewed)
       }
+      if (activeFilters.showDeleted && activeFilters.showDeleted !== 'true') {
+        params.append('showDeleted', activeFilters.showDeleted)
+      }
 
       const response = await fetch(`/api/admin/moderation/posts?${params}`)
       const data: PostsListResponse = await response.json()
@@ -145,7 +150,8 @@ export default function ContentModerationPanel() {
       minComments: '',
       hasImages: 'all',
       authorStatus: 'all',
-      isReviewed: 'all'
+      isReviewed: 'all',
+      showDeleted: 'true'
     }
     setTempFilters(emptyFilters)
     setActiveFilters(emptyFilters)
@@ -164,6 +170,7 @@ export default function ContentModerationPanel() {
     if (activeFilters.hasImages !== 'all') count++
     if (activeFilters.authorStatus !== 'all') count++
     if (activeFilters.isReviewed !== 'all') count++
+    if (activeFilters.showDeleted !== 'true') count++
     return count
   }
 
@@ -373,6 +380,21 @@ export default function ContentModerationPanel() {
               <option value="false">Pendientes</option>
             </select>
           </div>
+          {/* Mostrar eliminados */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Posts Eliminados
+            </label>
+            <select
+              value={tempFilters.showDeleted}
+              onChange={(e) => setTempFilters({ ...tempFilters, showDeleted: e.target.value as 'true' | 'false' | 'only' })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="true">Mostrar todos</option>
+              <option value="false">Solo activos</option>
+              <option value="only">Solo eliminados</option>
+            </select>
+          </div>
         </div>
 
         {/* Botones de filtros */}
@@ -442,15 +464,26 @@ export default function ContentModerationPanel() {
           {/* Grid de posts */}
           <div className="grid grid-cols-1 gap-6">
             {posts.map((post) => (
-              <div key={post.id} className="bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6">
+              <div key={post.id} className={`rounded-lg shadow hover:shadow-md transition-shadow p-6 ${
+                post.is_deleted ? 'bg-red-50 border-2 border-red-300' : 'bg-white'
+              }`}>
                 <div className="flex justify-between items-start gap-4">
                   {/* Contenido principal */}
                   <div className="flex-1 min-w-0">
                     {/* Título y categoría */}
                     <div className="mb-3">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-1 break-words">
-                        {post.title}
-                      </h3>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className={`text-lg font-semibold break-words flex-1 ${
+                          post.is_deleted ? 'text-gray-500 line-through' : 'text-gray-900'
+                        }`}>
+                          {post.title}
+                        </h3>
+                        {post.is_deleted && (
+                          <span className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full flex-shrink-0">
+                            ELIMINADO
+                          </span>
+                        )}
+                      </div>
                       {post.category && (
                         <span className="inline-block px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">
                           {post.category}

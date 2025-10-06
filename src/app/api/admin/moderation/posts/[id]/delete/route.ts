@@ -65,10 +65,13 @@ export async function POST(
       )
     }
 
-    // 2. Eliminar el post (hard delete por ahora, o puedes agregar columna is_deleted)
+    // 2. Marcar el post como eliminado (soft delete)
     const { error: deleteError } = await supabase
       .from('posts')
-      .delete()
+      .update({
+        is_deleted: true,
+        deleted_at: new Date().toISOString()
+      })
       .eq('id', postId)
 
     if (deleteError) {
