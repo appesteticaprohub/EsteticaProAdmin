@@ -514,3 +514,62 @@ export interface PermanentDeleteResponse {
   likes_deleted: number
   errors?: string[]
 }
+
+// ============================================
+// TIPOS PARA SISTEMA DE USUARIOS STAFF
+// ============================================
+
+export interface StaffUser {
+  id: string
+  email: string
+  password_plain: string
+  full_name: string
+  country: string
+  specialty: string
+  created_at: string
+  created_by?: string
+  user_type: string
+  subscription_status: string
+}
+
+export interface CreateStaffUserRequest {
+  email: string
+  password: string
+  full_name: string
+  country: string
+  specialty: string
+}
+
+export interface UpdateStaffPasswordRequest {
+  new_password: string
+}
+
+export interface StaffUsersResponse {
+  success: boolean
+  users: StaffUser[]
+  total: number
+  page: number
+  limit: number
+}
+
+export interface CreateStaffUserResponse {
+  success: boolean
+  user: StaffUser
+  message?: string
+}
+
+export interface UpdateStaffPasswordResponse {
+  success: boolean
+  message: string
+}
+
+export interface DeleteStaffUserResponse {
+  success: boolean
+  message: string
+  deleted: {
+    posts: number
+    comments: number
+    notifications: number
+    likes: number
+  }
+}

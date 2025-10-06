@@ -16,6 +16,7 @@ import StorageStatsPanel from '@/components/StorageStatsPanel'
 import BannedUsersPanel from '@/components/BannedUsersPanel'
 import ContentModerationPanel from '@/components/ContentModerationPanel'
 import DeletedPostsCleanup from '@/components/DeletedPostsCleanup'
+import StaffUserManagement from '@/components/StaffUserManagement'
 
 export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState('dashboard')
@@ -26,6 +27,8 @@ export default function AdminDashboard() {
         return <DashboardStats />
       case 'users':
         return <UserManagement />
+      case 'staff-users':
+        return <StaffUserManagement />
       case 'payments':
         return <PaymentGatewayManagement />
       case 'prices':

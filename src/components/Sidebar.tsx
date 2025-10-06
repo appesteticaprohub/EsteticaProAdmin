@@ -29,6 +29,11 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
       icon: '👥'
     },
     {
+      id: 'staff-users',
+      name: 'Usuarios Staff',
+      icon: '⭐'
+    },
+    {
       id: 'payments',
       name: 'Gestión Pasarela Pagos',
       icon: '💳'
@@ -62,7 +67,7 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
       submenu: [
         { id: 'notifications-broadcast', name: 'Broadcast Masivo', icon: '📢' },
         { id: 'notifications-newsletter', name: 'Newsletter', icon: '📰' },
-        { id: 'notifications-templates', name: 'Templates', icon: '📝' },
+        { id: 'notifications-templates', name: 'Templates', icon: '📄' },
         { id: 'notifications-logs', name: 'Logs', icon: '📋' },
         { id: 'notifications-cleanup', name: 'Limpieza', icon: '🗑️' }
       ]
