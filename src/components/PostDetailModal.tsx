@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { PostDetailResponse } from '@/types/admin'
 import ImageLightbox from './ImageLightbox'
 import BanUserModal from './BanUserModal'
+import CommentsTreeView from './CommentsTreeView'
 
 interface PostDetailModalProps {
   isOpen: boolean
@@ -407,61 +408,19 @@ export default function PostDetailModal({
                     )}
                   </div>
 
-                  {/* Comentarios */}
+                  {/* Comentarios con CommentsTreeView */}
                   <div className="bg-white border border-gray-200 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Comentarios ({postDetail.comments.length})
-                    </h3>
-                    
-                    {postDetail.comments.length === 0 ? (
-                      <p className="text-gray-500 text-center py-8">
-                        Este post no tiene comentarios
-                      </p>
-                    ) : (
-                      <div className="space-y-4">
-                        {postDetail.comments.map((comment) => (
-                          <div
-                            key={comment.id}
-                            className={`p-4 rounded-lg ${
-                              comment.is_deleted
-                                ? 'bg-red-50 border border-red-200'
-                                : 'bg-gray-50'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <p className="font-medium text-gray-900">
-                                    {comment.user?.full_name || 'Usuario desconocido'}
-                                  </p>
-                                  <span className="text-sm text-gray-500">
-                                    {comment.user?.email}
-                                  </span>
-                                  {comment.user?.is_banned && (
-                                    <span className="px-2 py-0.5 bg-red-100 text-red-800 text-xs rounded-full">
-                                      Banneado
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-gray-500">
-                                  {formatDate(comment.created_at)}
-                                </p>
-                              </div>
-                              {comment.is_deleted && (
-                                <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
-                                  Eliminado
-                                </span>
-                              )}
-                            </div>
-                            <p className={`text-sm break-words ${
-                              comment.is_deleted ? 'text-gray-500 line-through' : 'text-gray-700'
-                            }`}>
-                              {comment.content}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <CommentsTreeView
+                      comments={postDetail.comments}
+                      onCommentDeleted={() => {
+                        fetchPostDetail()
+                        onPostUpdated?.()
+                      }}
+                      onUserBanned={() => {
+                        fetchPostDetail()
+                        onPostUpdated?.()
+                      }}
+                    />
                   </div>
                 </div>
               )}
