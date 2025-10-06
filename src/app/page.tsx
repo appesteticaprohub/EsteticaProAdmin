@@ -14,6 +14,7 @@ import NotificationCleanup from '@/components/NotificationCleanup'
 import ImageSettingsPanel from '@/components/ImageSettingsPanel'
 import StorageStatsPanel from '@/components/StorageStatsPanel'
 import BannedUsersPanel from '@/components/BannedUsersPanel'
+import ContentModerationPanel from '@/components/ContentModerationPanel'
 
 export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState('dashboard')
@@ -45,6 +46,8 @@ export default function AdminDashboard() {
             <StorageStatsPanel />
           </div>
         )
+        case 'moderation-posts':
+        return <ContentModerationPanel />
         case 'moderation-banned':
         return <BannedUsersPanel />
       default:

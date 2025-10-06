@@ -49,6 +49,7 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
       icon: '⚖️',
       hasSubmenu: true,
       submenu: [
+        { id: 'moderation-posts', name: 'Posts', icon: '📝' },
         { id: 'moderation-banned', name: 'Usuarios Banneados', icon: '🚫' }
       ]
     },

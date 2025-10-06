@@ -52,8 +52,53 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServerSupabaseAdminClient()
 
-    // Construir query base - solo posts
-    let query = supabase
+    // PASO 1: Obtener IDs de autores que cumplen los filtros de autor
+    let authorIds: string[] = []
+    let shouldFilterByAuthor = false
+
+    if (authorEmail || authorName || authorStatus) {
+      shouldFilterByAuthor = true
+      
+      let authorQuery = supabase
+        .from('profiles')
+        .select('id')
+
+      if (authorEmail) {
+        authorQuery = authorQuery.ilike('email', `%${authorEmail}%`)
+      }
+
+      if (authorName) {
+        authorQuery = authorQuery.ilike('full_name', `%${authorName}%`)
+      }
+
+      if (authorStatus === 'active') {
+        authorQuery = authorQuery.eq('is_banned', false)
+      } else if (authorStatus === 'banned') {
+        authorQuery = authorQuery.eq('is_banned', true)
+      }
+
+      const { data: filteredAuthors } = await authorQuery
+      authorIds = filteredAuthors?.map((author: any) => author.id) || []
+
+      // Si no hay autores que cumplan los filtros, retornar vacío
+      if (authorIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          pagination: {
+            current_page: page,
+            total_pages: 0,
+            total_records: 0,
+            limit: limit,
+            has_next: false,
+            has_prev: false
+          }
+        })
+      }
+    }
+
+    // PASO 2: Construir query de posts con filtros aplicados
+    let postsQuery = supabase
       .from('posts')
       .select(`
         id,
@@ -68,47 +113,54 @@ export async function GET(request: NextRequest) {
         images,
         is_reviewed,
         reviewed_at,
-        reviewed_by
+        reviewed_by,
+        is_deleted,
+        deleted_at
       `, { count: 'exact' })
 
-    // Aplicar filtros
+    // Aplicar filtro de autores si es necesario
+    if (shouldFilterByAuthor && authorIds.length > 0) {
+      postsQuery = postsQuery.in('author_id', authorIds)
+    }
+
+    // Aplicar resto de filtros
     if (category) {
-      query = query.eq('category', category)
+      postsQuery = postsQuery.eq('category', category)
     }
 
     if (dateFrom) {
-      query = query.gte('created_at', dateFrom)
+      postsQuery = postsQuery.gte('created_at', dateFrom)
     }
 
     if (dateTo) {
-      query = query.lte('created_at', dateTo)
+      postsQuery = postsQuery.lte('created_at', dateTo)
     }
 
     if (minComments) {
-      query = query.gte('comments_count', parseInt(minComments))
+      postsQuery = postsQuery.gte('comments_count', parseInt(minComments))
     }
 
     if (hasImages === 'true') {
-      query = query.not('images', 'eq', '{}')
+      postsQuery = postsQuery.not('images', 'eq', '{}')
     } else if (hasImages === 'false') {
-      query = query.eq('images', '{}')
+      postsQuery = postsQuery.eq('images', '{}')
     }
 
     if (isReviewed === 'true') {
-      query = query.eq('is_reviewed', true)
+      postsQuery = postsQuery.eq('is_reviewed', true)
     } else if (isReviewed === 'false') {
-      query = query.eq('is_reviewed', false)
+      postsQuery = postsQuery.eq('is_reviewed', false)
     }
 
     // Ordenamiento
     const validSortColumns = ['created_at', 'views_count', 'likes_count', 'comments_count', 'title']
     const sortColumn = validSortColumns.includes(sortBy) ? sortBy : 'created_at'
-    query = query.order(sortColumn, { ascending: sortOrder === 'asc' })
+    postsQuery = postsQuery.order(sortColumn, { ascending: sortOrder === 'asc' })
 
     // Paginación
-    query = query.range(offset, offset + limit - 1)
+    postsQuery = postsQuery.range(offset, offset + limit - 1)
 
-    const { data: posts, error, count } = await query
+    const { data: posts, error, count } = await postsQuery
 
     if (error) {
       console.error('Error fetching posts:', JSON.stringify(error, null, 2))
@@ -118,46 +170,31 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Obtener información de autores manualmente
-    const authorIds = posts?.map((post: any) => post.author_id).filter(Boolean) || []
-    const { data: authors } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, country, specialty, user_type, subscription_status, is_banned, created_at')
-      .in('id', authorIds)
+    // PASO 3: Obtener información de autores para los posts obtenidos
+    const postAuthorIds = posts?.map((post: any) => post.author_id).filter(Boolean) || []
+    
+    let authors: any[] = []
+    if (postAuthorIds.length > 0) {
+      const { data: authorsData } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, country, specialty, user_type, subscription_status, is_banned, created_at')
+        .in('id', postAuthorIds)
+      
+      authors = authorsData || []
+    }
 
-    // Mapear autores a posts
+    // PASO 4: Mapear autores a posts
     const postsWithAuthors = posts?.map((post: any) => ({
       ...post,
-      author: authors?.find((author: any) => author.id === post.author_id) || null
+      author: authors.find((author: any) => author.id === post.author_id) || null
     })) || []
-
-    // Filtrar por autor después de la query (filtros complejos)
-    let filteredPosts = postsWithAuthors || []
-
-    if (authorEmail) {
-      filteredPosts = filteredPosts.filter((post: any) => 
-        post.author?.email?.toLowerCase().includes(authorEmail.toLowerCase())
-      )
-    }
-
-    if (authorName) {
-      filteredPosts = filteredPosts.filter((post: any) =>
-        post.author?.full_name?.toLowerCase().includes(authorName.toLowerCase())
-      )
-    }
-
-    if (authorStatus === 'active') {
-      filteredPosts = filteredPosts.filter((post: any) => !post.author?.is_banned)
-    } else if (authorStatus === 'banned') {
-      filteredPosts = filteredPosts.filter((post: any) => post.author?.is_banned)
-    }
 
     // Calcular paginación
     const totalPages = Math.ceil((count || 0) / limit)
 
     return NextResponse.json({
       success: true,
-      data: filteredPosts,
+      data: postsWithAuthors,
       pagination: {
         current_page: page,
         total_pages: totalPages,

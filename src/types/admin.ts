@@ -386,3 +386,34 @@ export interface ImageSettingsUpdateRequest {
   max_width?: number
   max_height?: number
 }
+
+// Tipos para ContentModerationPanel
+export interface PostsFilters {
+  category?: string
+  authorEmail?: string
+  authorName?: string
+  dateFrom?: string
+  dateTo?: string
+  minComments?: string
+  hasImages?: 'true' | 'false' | 'all'
+  authorStatus?: 'active' | 'banned' | 'all'
+  isReviewed?: 'true' | 'false' | 'all'
+}
+
+export interface PostsSortOptions {
+  sortBy: 'created_at' | 'views_count' | 'likes_count' | 'comments_count' | 'title'
+  sortOrder: 'asc' | 'desc'
+}
+
+export interface PostsListResponse {
+  success: boolean
+  data: PostWithAuthor[]
+  pagination: {
+    current_page: number
+    total_pages: number
+    total_records: number
+    limit: number
+    has_next: boolean
+    has_prev: boolean
+  }
+}
