@@ -76,15 +76,104 @@ export async function DELETE(
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
 
-    // 1. PRIMERO: Eliminar usuario de Supabase Auth (esto invalida todas sus sesiones)
-    const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(userId)
+    // ORDEN CRÍTICO DE ELIMINACIÓN:
+    // 1. Primero eliminar contenido relacionado manualmente
+    // 2. Luego eliminar de profiles (cascada automática para el resto)
+    // 3. Finalmente eliminar de Auth
 
-    if (deleteAuthError) {
-      console.error('Error deleting auth user:', deleteAuthError)
-      return NextResponse.json(
-        { success: false, error: 'Failed to delete user from authentication system' },
-        { status: 500 }
-      )
+    console.log(`Iniciando eliminación de usuario staff: ${userId}`)
+
+    // 1. Eliminar contenido del usuario manualmente (para evitar problemas de foreign keys)
+    
+    // Eliminar likes
+    const { error: deleteLikesError } = await supabase
+      .from('post_likes')
+      .delete()
+      .eq('user_id', userId)
+    
+    if (deleteLikesError) {
+      console.error('Error deleting likes:', deleteLikesError)
+    }
+
+    // Eliminar notificaciones ENVIADAS al usuario
+    const { error: deleteNotificationsError } = await supabase
+      .from('notifications')
+      .delete()
+      .eq('user_id', userId)
+    
+    if (deleteNotificationsError) {
+      console.error('Error deleting notifications:', deleteNotificationsError)
+    }
+
+    // Eliminar notificaciones CREADAS por el usuario (sender_id)
+    const { error: deleteSenderNotificationsError } = await supabase
+      .from('notifications')
+      .delete()
+      .eq('sender_id', userId)
+    
+    if (deleteSenderNotificationsError) {
+      console.error('Error deleting sender notifications:', deleteSenderNotificationsError)
+    }
+
+    // Eliminar comentarios
+    const { error: deleteCommentsError } = await supabase
+      .from('comments')
+      .delete()
+      .eq('user_id', userId)
+    
+    if (deleteCommentsError) {
+      console.error('Error deleting comments:', deleteCommentsError)
+    }
+
+    // Eliminar posts Y sus imágenes del storage
+    // Primero obtener todos los posts con sus imágenes
+    const { data: userPosts, error: fetchPostsError } = await supabase
+      .from('posts')
+      .select('id, images')
+      .eq('author_id', userId)
+    
+    if (fetchPostsError) {
+      console.error('Error fetching user posts:', fetchPostsError)
+    } else if (userPosts && userPosts.length > 0) {
+      console.log(`Encontrados ${userPosts.length} posts del usuario`)
+      
+      // Eliminar imágenes de cada post del storage
+      for (const post of userPosts) {
+        if (post.images && Array.isArray(post.images) && post.images.length > 0) {
+          console.log(`Eliminando ${post.images.length} imágenes del post ${post.id}`)
+          
+          // Extraer los paths de las imágenes desde las URLs
+          const imagePaths = post.images.map((url: string) => {
+            // URL ejemplo: https://[project].supabase.co/storage/v1/object/public/post-images/[path]
+            const match = url.match(/post-images\/(.+)$/)
+            return match ? match[1] : null
+          }).filter((path: string | null): path is string => path !== null)
+          
+          if (imagePaths.length > 0) {
+            const { error: deleteStorageError } = await supabase.storage
+              .from('post-images')
+              .remove(imagePaths)
+            
+            if (deleteStorageError) {
+              console.error(`Error deleting images from storage for post ${post.id}:`, deleteStorageError)
+            } else {
+              console.log(`✅ ${imagePaths.length} imágenes eliminadas del storage`)
+            }
+          }
+        }
+      }
+    }
+
+    // Ahora sí eliminar los posts de la BD
+    const { error: deletePostsError } = await supabase
+      .from('posts')
+      .delete()
+      .eq('author_id', userId)
+    
+    if (deletePostsError) {
+      console.error('Error deleting posts:', deletePostsError)
+    } else {
+      console.log(`✅ Posts eliminados de la base de datos`)
     }
 
     // 2. Eliminar de staff_credentials
@@ -97,7 +186,7 @@ export async function DELETE(
       console.error('Error deleting staff credentials:', deleteCredError)
     }
 
-    // 3. Eliminar de profiles (esto eliminará posts, comments, etc por cascada)
+    // 3. Eliminar de profiles
     const { error: deleteProfileError } = await supabase
       .from('profiles')
       .delete()
@@ -105,13 +194,22 @@ export async function DELETE(
 
     if (deleteProfileError) {
       console.error('Error deleting profile:', deleteProfileError)
-      // Continuamos porque el usuario de Auth ya fue eliminado
+      return NextResponse.json(
+        { success: false, error: 'Failed to delete user profile' },
+        { status: 500 }
+      )
     }
+
+    // 4. FINALMENTE: Eliminar de Supabase Auth (invalida sesiones)
+    const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(userId)
 
     if (deleteAuthError) {
       console.error('Error deleting auth user:', deleteAuthError)
-      // No retornamos error aquí porque el perfil ya fue eliminado
+      // No retornamos error porque el perfil y contenido ya fueron eliminados
+      console.log('Usuario eliminado de BD pero falló eliminación de Auth')
     }
+
+    console.log(`✅ Usuario staff eliminado completamente: ${userId}`)
 
     // La cascada ON DELETE en la base de datos automáticamente elimina:
     // - Registro en profiles
