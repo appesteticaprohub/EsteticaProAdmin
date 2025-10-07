@@ -60,6 +60,11 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
       ]
     },
     {
+      id: 'backups',
+      name: 'Backups',
+      icon: '💾'
+    },
+    {
       id: 'notifications',
       name: 'Notificaciones',
       icon: '🔔',
