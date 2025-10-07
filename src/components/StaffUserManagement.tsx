@@ -1,5 +1,46 @@
 'use client'
 
+'use client'
+
+// Listas de opciones (mismas que en app de usuarios)
+const LATIN_AMERICAN_COUNTRIES = [
+  { value: 'argentina', label: 'Argentina' },
+  { value: 'bolivia', label: 'Bolivia' },
+  { value: 'brasil', label: 'Brasil' },
+  { value: 'chile', label: 'Chile' },
+  { value: 'colombia', label: 'Colombia' },
+  { value: 'costa_rica', label: 'Costa Rica' },
+  { value: 'cuba', label: 'Cuba' },
+  { value: 'ecuador', label: 'Ecuador' },
+  { value: 'el_salvador', label: 'El Salvador' },
+  { value: 'guatemala', label: 'Guatemala' },
+  { value: 'honduras', label: 'Honduras' },
+  { value: 'mexico', label: 'México' },
+  { value: 'nicaragua', label: 'Nicaragua' },
+  { value: 'panama', label: 'Panamá' },
+  { value: 'paraguay', label: 'Paraguay' },
+  { value: 'peru', label: 'Perú' },
+  { value: 'puerto_rico', label: 'Puerto Rico' },
+  { value: 'republica_dominicana', label: 'República Dominicana' },
+  { value: 'uruguay', label: 'Uruguay' },
+  { value: 'venezuela', label: 'Venezuela' }
+]
+
+const SPECIALTIES = [
+  { value: 'cosmetología', label: 'Cosmetología' },
+  { value: 'cosmiatría', label: 'Cosmiatría' },
+  { value: 'medicina_estetica', label: 'Medicina Estética' },
+  { value: 'esteticista', label: 'Esteticista' },
+  { value: 'enfermería', label: 'Enfermería' },
+  { value: 'masoterapia', label: 'Masoterapia' },
+  { value: 'medicina_general', label: 'Medicina general' },
+  { value: 'cirugía_plástica', label: 'Cirugía plástica' },
+  { value: 'fisioterapia', label: 'Fisioterapia' },
+  { value: 'terapias_holísticas', label: 'Terapias holísticas' },
+  { value: 'spa_manager', label: 'Spa manager' },
+  { value: 'dermatología', label: 'Dermatología' }
+]
+
 import { useState, useEffect } from 'react'
 import { StaffUser, StaffUsersResponse, CreateStaffUserRequest } from '@/types/admin'
 
@@ -293,28 +334,38 @@ export default function StaffUserManagement() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   País *
                 </label>
-                <input
-                  type="text"
+                <select
                   required
                   value={formData.country}
                   onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Colombia"
-                />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                >
+                  <option value="">Selecciona un país</option>
+                  {LATIN_AMERICAN_COUNTRIES.map((country) => (
+                    <option key={country.value} value={country.label}>
+                      {country.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Especialidad *
                 </label>
-                <input
-                  type="text"
+                <select
                   required
                   value={formData.specialty}
                   onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Dermatología"
-                />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                >
+                  <option value="">Selecciona una especialidad</option>
+                  {SPECIALTIES.map((specialty) => (
+                    <option key={specialty.value} value={specialty.label}>
+                      {specialty.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
