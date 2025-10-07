@@ -73,14 +73,16 @@ export class BackupService {
   private async getTableColumns(tableName: string): Promise<ColumnInfo[]> {
     const query = `
       SELECT 
-        column_name as name,
-        data_type as type,
-        is_nullable as nullable,
-        column_default as default_value
-      FROM information_schema.columns
-      WHERE table_schema = 'public' 
-        AND table_name = '${tableName}'
-      ORDER BY ordinal_position
+        a.attname as name,
+        pg_catalog.format_type(a.atttypid, a.atttypmod) as type,
+        CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END as nullable,
+        pg_get_expr(d.adbin, d.adrelid) as default_value
+      FROM pg_attribute a
+      LEFT JOIN pg_attrdef d ON (a.attrelid, a.attnum) = (d.adrelid, d.adnum)
+      WHERE a.attrelid = '${tableName}'::regclass
+        AND a.attnum > 0
+        AND NOT a.attisdropped
+      ORDER BY a.attnum
     `
 
     const { data, error } = await this.supabase.rpc('execute_sql', { 

@@ -139,7 +139,10 @@ CREATE TABLE public."${tableName}" (
    * Formatea la definición de una columna
    */
   private static formatColumnDefinition(col: ColumnInfo): string {
-    let def = `"${col.name}" ${col.type}`
+    // Normalizar el tipo de dato
+    const normalizedType = this.normalizeDataType(col.type)
+    
+    let def = `"${col.name}" ${normalizedType}`
     
     if (!col.nullable) {
       def += ' NOT NULL'
@@ -150,6 +153,37 @@ CREATE TABLE public."${tableName}" (
     }
     
     return def
+  }
+
+  /**
+   * Normaliza tipos de datos de PostgreSQL
+   */
+  private static normalizeDataType(type: string): string {
+    // Si el tipo es "ARRAY", necesitamos convertirlo al formato correcto
+    // PostgreSQL reporta "ARRAY" pero la sintaxis correcta es "tipo[]"
+    
+    // Casos especiales conocidos
+    const typeMap: Record<string, string> = {
+      'ARRAY': 'text[]', // Por defecto, pero esto debería detectarse mejor
+      'character varying': 'varchar',
+      'timestamp without time zone': 'timestamp',
+      'timestamp with time zone': 'timestamptz',
+      'time without time zone': 'time',
+      'time with time zone': 'timetz'
+    }
+    
+    // Convertir a minúsculas para comparación
+    const lowerType = type.toLowerCase()
+    
+    // Buscar en el mapa
+    for (const [key, value] of Object.entries(typeMap)) {
+      if (lowerType.includes(key.toLowerCase())) {
+        return value
+      }
+    }
+    
+    // Si no está en el mapa, retornar el tipo original
+    return type
   }
 
   /**
@@ -201,8 +235,26 @@ ${insertStatements.join('\n\n')}`
       return value.toString()
     }
     
+    if (Array.isArray(value)) {
+      // Array de PostgreSQL
+      if (value.length === 0) {
+        return "ARRAY[]::text[]"
+      }
+      
+      // Formatear cada elemento del array
+      const formattedElements = value.map(item => {
+        if (item === null || item === undefined) {
+          return 'NULL'
+        }
+        // Escapar comillas simples en cada elemento
+        return `'${item.toString().replace(/'/g, "''")}'`
+      })
+      
+      return `ARRAY[${formattedElements.join(', ')}]::text[]`
+    }
+    
     if (typeof value === 'object') {
-      // JSON objects/arrays
+      // JSON objects (no arrays, ya los manejamos arriba)
       return `'${JSON.stringify(value).replace(/'/g, "''")}'::jsonb`
     }
     
