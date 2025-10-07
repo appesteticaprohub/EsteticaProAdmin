@@ -7,21 +7,8 @@ export default function BackupPanel() {
   // Estados del formulario
   const [backupType, setBackupType] = useState<'full' | 'selective'>('full')
   const [selectedTables, setSelectedTables] = useState<string[]>([])
-  const [availableTables] = useState<string[]>([
-    'app_settings',
-    'comments',
-    'email_logs',
-    'email_templates',
-    'likes',
-    'moderation_logs',
-    'newsletter_settings',
-    'notification_preferences',
-    'notifications',
-    'payment_sessions',
-    'posts',
-    'profiles',
-    'staff_credentials'
-  ])
+  const [availableTables, setAvailableTables] = useState<string[]>([])
+  const [loadingTables, setLoadingTables] = useState(true)
   
   // Opciones de backup
   const [options, setOptions] = useState({
@@ -45,6 +32,36 @@ export default function BackupPanel() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  // Efecto para cargar las tablas disponibles al montar el componente
+  useEffect(() => {
+    const fetchTables = async () => {
+      try {
+        setLoadingTables(true)
+        const response = await fetch('/api/admin/backup/tables')
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Error al cargar tablas')
+        }
+
+        if (result.success && result.tables) {
+          setAvailableTables(result.tables)
+          // Si es modo completo, seleccionar todas automáticamente
+          if (backupType === 'full') {
+            setSelectedTables(result.tables)
+          }
+        }
+      } catch (err) {
+        console.error('Error cargando tablas:', err)
+        setError('Error al cargar la lista de tablas disponibles')
+      } finally {
+        setLoadingTables(false)
+      }
+    }
+
+    fetchTables()
+  }, []) // Solo se ejecuta al montar el componente
 
   // Efecto para seleccionar todas las tablas y opciones cuando cambia a modo completo
   useEffect(() => {
@@ -259,31 +276,44 @@ export default function BackupPanel() {
               </label>
               <button
                 onClick={handleToggleAllTables}
-                disabled={loading}
-                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                disabled={loading || loadingTables}
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
               >
                 {selectedTables.length === availableTables.length
                   ? 'Deseleccionar todas'
                   : 'Seleccionar todas'}
               </button>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-lg max-h-60 overflow-y-auto">
-              {availableTables.map(table => (
-                <label key={table} className="flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedTables.includes(table)}
-                    onChange={() => handleToggleTable(table)}
-                    disabled={loading}
-                    className="mr-2"
-                  />
-                  <span className="text-sm text-gray-700">{table}</span>
-                </label>
-              ))}
-            </div>
-            <p className="text-sm text-gray-500 mt-2">
-              {selectedTables.length} de {availableTables.length} tablas seleccionadas
-            </p>
+            
+            {loadingTables ? (
+              <div className="p-4 bg-gray-50 rounded-lg text-center text-gray-500">
+                <div className="animate-pulse">Cargando tablas disponibles...</div>
+              </div>
+            ) : availableTables.length === 0 ? (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-center text-yellow-700">
+                No se encontraron tablas disponibles
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-lg max-h-60 overflow-y-auto">
+                  {availableTables.map(table => (
+                    <label key={table} className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedTables.includes(table)}
+                        onChange={() => handleToggleTable(table)}
+                        disabled={loading}
+                        className="mr-2"
+                      />
+                      <span className="text-sm text-gray-700">{table}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-sm text-gray-500 mt-2">
+                  {selectedTables.length} de {availableTables.length} tablas seleccionadas
+                </p>
+              </>
+            )}
           </div>
         )}
 
