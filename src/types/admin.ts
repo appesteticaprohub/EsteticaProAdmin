@@ -16,6 +16,8 @@ export interface Profile {
   birth_date: string | null
   subscription_expires_at: string | null
   auto_renewal_enabled: boolean
+  is_banned: boolean
+  role: string
 }
 
 export interface Post {
@@ -310,6 +312,38 @@ export interface UserStats {
     banned_reason: string
     unbanned_at: string | null
   }>
+}
+
+// Tipos para paginación de usuarios
+export interface UsersPagination {
+  current_page: number
+  total_pages: number
+  total_records: number
+  limit: number
+  has_next: boolean
+  has_prev: boolean
+}
+
+// Tipos para filtros de usuarios
+export interface UsersFilters {
+  search_name?: string
+  search_email?: string
+  status?: string
+  role?: string
+  is_banned?: string
+  country?: string
+  auto_renewal?: string
+  subscription_status?: string
+  sort_by?: string
+  sort_order?: 'asc' | 'desc'
+}
+
+// Respuesta de la API de usuarios con paginación
+export interface UsersListResponse {
+  success: boolean
+  users: Profile[]
+  pagination: UsersPagination
+  error?: string
 }
 
 export interface ProfileWithStats extends Profile {

@@ -32,16 +32,24 @@ export async function GET(request: NextRequest) {
     
     // Parámetros de paginación
     const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const limit = parseInt(searchParams.get('limit') || '25')
     const offset = (page - 1) * limit
 
-    // Parámetros de filtros
-    const status = searchParams.get('status') // 'active', 'banned', 'all'
-    const userType = searchParams.get('userType') // 'anonymous', 'premium'
+    // Parámetros de búsqueda
+    const searchName = searchParams.get('search_name')
+    const searchEmail = searchParams.get('search_email')
+
+    // Parámetros de filtros adicionales
+    const status = searchParams.get('status')
+    const role = searchParams.get('role')
+    const isBanned = searchParams.get('is_banned')
     const country = searchParams.get('country')
-    const specialty = searchParams.get('specialty')
-    const subscriptionStatus = searchParams.get('subscriptionStatus')
-    const search = searchParams.get('search') // buscar por nombre o email
+    const autoRenewal = searchParams.get('auto_renewal')
+    const subscriptionStatus = searchParams.get('subscription_status')
+    
+    // Parámetros de ordenamiento
+    const sortBy = searchParams.get('sort_by') || 'created_at'
+    const sortOrder = (searchParams.get('sort_order') || 'desc') as 'asc' | 'desc'
 
     const supabase = createServerSupabaseAdminClient()
 
@@ -50,31 +58,46 @@ export async function GET(request: NextRequest) {
       .from('profiles')
       .select('*', { count: 'exact' })
 
-    // Aplicar filtros
+    // Aplicar filtro de búsqueda por nombre
+    if (searchName && searchName.trim() !== '') {
+      query = query.ilike('full_name', `%${searchName.trim()}%`)
+    }
+
+    // Aplicar filtro de búsqueda por email
+    if (searchEmail && searchEmail.trim() !== '') {
+      query = query.ilike('email', `%${searchEmail.trim()}%`)
+    }
+
+    // Aplicar filtros adicionales
     if (status === 'active') {
       query = query.eq('is_banned', false)
     } else if (status === 'banned') {
       query = query.eq('is_banned', true)
     }
 
-    if (userType) {
-      query = query.eq('user_type', userType)
+    if (role && role !== 'all') {
+      query = query.eq('role', role)
     }
 
-    if (country) {
+    if (isBanned && isBanned !== 'all') {
+      query = query.eq('is_banned', isBanned === 'true')
+    }
+
+    if (country && country !== 'all') {
       query = query.eq('country', country)
     }
 
-    if (specialty) {
-      query = query.eq('specialty', specialty)
+    if (autoRenewal && autoRenewal !== 'all') {
+      query = query.eq('auto_renewal_enabled', autoRenewal === 'true')
     }
 
-    if (subscriptionStatus) {
+    if (subscriptionStatus && subscriptionStatus !== 'all') {
       query = query.eq('subscription_status', subscriptionStatus)
     }
 
-    // Ordenar por fecha de creación (más recientes primero)
-    query = query.order('created_at', { ascending: false })
+    // Ordenar
+    const ascending = sortOrder === 'asc'
+    query = query.order(sortBy, { ascending })
 
     // Paginación
     query = query.range(offset, offset + limit - 1)
@@ -89,47 +112,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Filtrar por búsqueda después de la query (para nombre o email)
-    let filteredUsers = users || []
-
-    if (search) {
-      const searchLower = search.toLowerCase()
-      filteredUsers = filteredUsers.filter((user: any) =>
-        user.full_name?.toLowerCase().includes(searchLower) ||
-        user.email?.toLowerCase().includes(searchLower)
-      )
-    }
-
-    // Para cada usuario, obtener estadísticas básicas
-    const usersWithStats = await Promise.all(
-      filteredUsers.map(async (user: any) => {
-        const { count: totalPosts } = await supabase
-          .from('posts')
-          .select('*', { count: 'exact', head: true })
-          .eq('author_id', user.id)
-
-        const { count: totalComments } = await supabase
-          .from('comments')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('is_deleted', false)
-
-        return {
-          ...user,
-          stats: {
-            total_posts: totalPosts || 0,
-            total_comments: totalComments || 0
-          }
-        }
-      })
-    )
-
     // Calcular paginación
     const totalPages = Math.ceil((count || 0) / limit)
 
     return NextResponse.json({
       success: true,
-      data: usersWithStats,
+      users: users || [],
       pagination: {
         current_page: page,
         total_pages: totalPages,
