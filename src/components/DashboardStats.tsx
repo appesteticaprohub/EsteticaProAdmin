@@ -6,31 +6,15 @@ import { useEffect, useState } from 'react'
 import StatsCard from './StatsCard'
 import SystemStatusCard from './SystemStatusCard'
 
-interface DashboardData {
+interface InitialData {
   users: {
     total: number
-    growthPercentage: number
-    newToday: number
-    newThisWeek: number
-    newThisMonth: number
-    newThisYear: number
   }
   posts: {
     total: number
-    deleted: number
-    growthPercentage: number
-    publishedToday: number
-    publishedThisWeek: number
-    publishedThisMonth: number
-    publishedThisYear: number
   }
   subscriptions: {
     active: number
-    growthPercentage: number
-    activatedToday: number
-    activatedThisWeek: number
-    activatedThisMonth: number
-    activatedThisYear: number
   }
   system: {
     serverStatus: 'active' | 'inactive'
@@ -39,16 +23,57 @@ interface DashboardData {
   }
 }
 
+interface PeriodData {
+  count: number
+  previousCount: number
+  growthPercentage: number
+  label: string
+  period: string
+}
+
+interface CardData {
+  value: number
+  label: string
+  change: string
+  changeType: 'positive' | 'negative' | 'neutral'
+  isLoading: boolean
+}
+
 export default function DashboardStats() {
-  const [data, setData] = useState<DashboardData | null>(null)
+  const [initialData, setInitialData] = useState<InitialData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Estados individuales para cada card
+  const [usersData, setUsersData] = useState<CardData>({
+    value: 0,
+    label: 'Total Usuarios',
+    change: '',
+    changeType: 'neutral',
+    isLoading: false
+  })
+
+  const [postsData, setPostsData] = useState<CardData>({
+    value: 0,
+    label: 'Total Posts',
+    change: '',
+    changeType: 'neutral',
+    isLoading: false
+  })
+
+  const [subscriptionsData, setSubscriptionsData] = useState<CardData>({
+    value: 0,
+    label: 'Suscripciones Activas',
+    change: '',
+    changeType: 'neutral',
+    isLoading: false
+  })
+
   useEffect(() => {
-    fetchDashboardStats()
+    fetchInitialStats()
   }, [])
 
-  const fetchDashboardStats = async () => {
+  const fetchInitialStats = async () => {
     try {
       setLoading(true)
       setError(null)
@@ -60,13 +85,162 @@ export default function DashboardStats() {
       }
       
       const result = await response.json()
-      setData(result)
+      setInitialData(result)
+
+      // Inicializar las cards con los totales
+      setUsersData({
+        value: result.users.total,
+        label: 'Total Usuarios',
+        change: '',
+        changeType: 'neutral',
+        isLoading: false
+      })
+
+      setPostsData({
+        value: result.posts.total,
+        label: 'Total Posts',
+        change: '',
+        changeType: 'neutral',
+        isLoading: false
+      })
+
+      setSubscriptionsData({
+        value: result.subscriptions.active,
+        label: 'Suscripciones Activas',
+        change: '',
+        changeType: 'neutral',
+        isLoading: false
+      })
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido')
       console.error('Error fetching dashboard stats:', err)
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleUsersPeriodChange = async (period: string) => {
+    if (period === 'total' && initialData) {
+      setUsersData({
+        value: initialData.users.total,
+        label: 'Total Usuarios',
+        change: '',
+        changeType: 'neutral',
+        isLoading: false
+      })
+      return
+    }
+
+    try {
+      setUsersData(prev => ({ ...prev, isLoading: true }))
+      
+      const response = await fetch(`/api/admin/dashboard/users?period=${period}`)
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar datos de usuarios')
+      }
+      
+      const result: PeriodData = await response.json()
+      
+      setUsersData({
+        value: result.count,
+        label: result.label,
+        change: formatChange(result.growthPercentage, result.count, result.previousCount),
+        changeType: getChangeType(result.growthPercentage),
+        isLoading: false
+      })
+
+    } catch (err) {
+      console.error('Error fetching users period data:', err)
+      setUsersData(prev => ({ ...prev, isLoading: false }))
+    }
+  }
+
+  const handlePostsPeriodChange = async (period: string) => {
+    if (period === 'total' && initialData) {
+      setPostsData({
+        value: initialData.posts.total,
+        label: 'Total Posts',
+        change: '',
+        changeType: 'neutral',
+        isLoading: false
+      })
+      return
+    }
+
+    try {
+      setPostsData(prev => ({ ...prev, isLoading: true }))
+      
+      const response = await fetch(`/api/admin/dashboard/posts?period=${period}`)
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar datos de posts')
+      }
+      
+      const result: PeriodData = await response.json()
+      
+      setPostsData({
+        value: result.count,
+        label: result.label,
+        change: formatChange(result.growthPercentage, result.count, result.previousCount),
+        changeType: getChangeType(result.growthPercentage),
+        isLoading: false
+      })
+
+    } catch (err) {
+      console.error('Error fetching posts period data:', err)
+      setPostsData(prev => ({ ...prev, isLoading: false }))
+    }
+  }
+
+  const handleSubscriptionsPeriodChange = async (period: string) => {
+    if (period === 'total' && initialData) {
+      setSubscriptionsData({
+        value: initialData.subscriptions.active,
+        label: 'Suscripciones Activas',
+        change: '',
+        changeType: 'neutral',
+        isLoading: false
+      })
+      return
+    }
+
+    try {
+      setSubscriptionsData(prev => ({ ...prev, isLoading: true }))
+      
+      const response = await fetch(`/api/admin/dashboard/subscriptions?period=${period}`)
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar datos de suscripciones')
+      }
+      
+      const result: PeriodData = await response.json()
+      
+      setSubscriptionsData({
+        value: result.count,
+        label: result.label,
+        change: formatChange(result.growthPercentage, result.count, result.previousCount),
+        changeType: getChangeType(result.growthPercentage),
+        isLoading: false
+      })
+
+    } catch (err) {
+      console.error('Error fetching subscriptions period data:', err)
+      setSubscriptionsData(prev => ({ ...prev, isLoading: false }))
+    }
+  }
+
+  const formatChange = (percentage: number, current: number, previous: number): string => {
+    const diff = current - previous
+    const sign = percentage >= 0 ? '+' : ''
+    return `${sign}${percentage.toFixed(1)}% (${sign}${diff}) vs período anterior`
+  }
+
+  const getChangeType = (percentage: number): 'positive' | 'negative' | 'neutral' => {
+    if (percentage > 0) return 'positive'
+    if (percentage < 0) return 'negative'
+    return 'neutral'
   }
 
   if (loading) {
@@ -100,7 +274,7 @@ export default function DashboardStats() {
           <p className="text-red-800 font-medium">Error al cargar estadísticas</p>
           <p className="text-red-600 text-sm mt-1">{error}</p>
           <button
-            onClick={fetchDashboardStats}
+            onClick={fetchInitialStats}
             className="mt-3 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
           >
             Reintentar
@@ -110,7 +284,7 @@ export default function DashboardStats() {
     )
   }
 
-  if (!data) return null
+  if (!initialData) return null
 
   return (
     <div className="px-4 py-6">
@@ -121,60 +295,49 @@ export default function DashboardStats() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Total Usuarios */}
+        {/* Card Usuarios */}
         <StatsCard
-          title="Total Usuarios"
-          value={data.users.total}
-          change={`${data.users.growthPercentage >= 0 ? '+' : ''}${data.users.growthPercentage}%`}
-          changeType={data.users.growthPercentage >= 0 ? 'positive' : 'negative'}
+          title={usersData.label}
+          value={usersData.value}
+          change={usersData.change}
+          changeType={usersData.changeType}
           icon="👥"
-          details={[
-            { label: 'Nuevos hoy', value: data.users.newToday },
-            { label: 'Nuevos esta semana', value: data.users.newThisWeek },
-            { label: 'Nuevos este mes', value: data.users.newThisMonth },
-            { label: 'Nuevos este año', value: data.users.newThisYear }
-          ]}
+          type="users"
+          onPeriodChange={handleUsersPeriodChange}
+          isLoading={usersData.isLoading}
         />
 
-        {/* Posts Publicados */}
+        {/* Card Posts */}
         <StatsCard
-          title="Posts Publicados"
-          value={data.posts.total}
-          change={`${data.posts.growthPercentage >= 0 ? '+' : ''}${data.posts.growthPercentage}%`}
-          changeType={data.posts.growthPercentage >= 0 ? 'positive' : 'negative'}
+          title={postsData.label}
+          value={postsData.value}
+          change={postsData.change}
+          changeType={postsData.changeType}
           icon="📄"
-          details={[
-            { label: 'Posts activos', value: data.posts.total },
-            { label: 'Posts eliminados', value: data.posts.deleted },
-            { label: 'Publicados hoy', value: data.posts.publishedToday },
-            { label: 'Publicados esta semana', value: data.posts.publishedThisWeek },
-            { label: 'Publicados este mes', value: data.posts.publishedThisMonth },
-            { label: 'Publicados este año', value: data.posts.publishedThisYear }
-          ]}
+          type="posts"
+          onPeriodChange={handlePostsPeriodChange}
+          isLoading={postsData.isLoading}
         />
 
-        {/* Suscripciones Activas */}
+        {/* Card Suscripciones */}
         <StatsCard
-          title="Suscripciones Activas"
-          value={data.subscriptions.active}
-          change={`${data.subscriptions.growthPercentage >= 0 ? '+' : ''}${data.subscriptions.growthPercentage}%`}
-          changeType={data.subscriptions.growthPercentage >= 0 ? 'positive' : 'negative'}
+          title={subscriptionsData.label}
+          value={subscriptionsData.value}
+          change={subscriptionsData.change}
+          changeType={subscriptionsData.changeType}
           icon="⭐"
-          details={[
-            { label: 'Activadas hoy', value: data.subscriptions.activatedToday },
-            { label: 'Activadas esta semana', value: data.subscriptions.activatedThisWeek },
-            { label: 'Activadas este mes', value: data.subscriptions.activatedThisMonth },
-            { label: 'Activadas este año', value: data.subscriptions.activatedThisYear }
-          ]}
+          type="subscriptions"
+          onPeriodChange={handleSubscriptionsPeriodChange}
+          isLoading={subscriptionsData.isLoading}
         />
       </div>
 
       {/* System Status */}
       <div className="mt-8">
         <SystemStatusCard
-          serverStatus={data.system.serverStatus}
-          databaseStatus={data.system.databaseStatus}
-          version={data.system.version}
+          serverStatus={initialData.system.serverStatus}
+          databaseStatus={initialData.system.databaseStatus}
+          version={initialData.system.version}
         />
       </div>
     </div>
