@@ -18,6 +18,7 @@ import ContentModerationPanel from '@/components/ContentModerationPanel'
 import DeletedPostsCleanup from '@/components/DeletedPostsCleanup'
 import StaffUserManagement from '@/components/StaffUserManagement'
 import BackupPanel from '@/components/BackupPanel'
+import AnonymousLimitSettings from '@/components/AnonymousLimitSettings'
 
 export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState('dashboard')
@@ -57,6 +58,8 @@ export default function AdminDashboard() {
         return <BannedUsersPanel />
         case 'moderation-cleanup':
         return <DeletedPostsCleanup />
+        case 'moderation-anonymous-limit':
+        return <AnonymousLimitSettings />
         case 'backups':
         return <BackupPanel />
       default:

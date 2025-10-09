@@ -56,7 +56,8 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
       submenu: [
         { id: 'moderation-posts', name: 'Posts', icon: '📝' },
         { id: 'moderation-banned', name: 'Usuarios Banneados', icon: '🚫' },
-        { id: 'moderation-cleanup', name: 'Limpieza de Posts', icon: '🗑️' }
+        { id: 'moderation-cleanup', name: 'Limpieza de Posts', icon: '🗑️' },
+        { id: 'moderation-anonymous-limit', name: 'Límite Anónimos', icon: '👁️' }
       ]
     },
     {
