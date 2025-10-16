@@ -118,10 +118,38 @@ export class NotificationBroadcastService {
     let template = null
     let htmlContent = ''
     let subject = notification.title
-    let templateKey = notification.template_key || 'broadcast_custom' // Default si no hay template
+    let templateKey = notification.template_key || 'broadcast_custom'
 
-    // Si hay template_id, obtener template
-    if (notification.template_id) {
+    console.log('🔍 Buscando template con:', {
+      template_id: notification.template_id,
+      template_key: notification.template_key
+    })
+
+    // Buscar template por template_key (que viene del frontend cuando se selecciona un template)
+    if (notification.template_key) {
+      const { data: templateData, error: templateError } = await supabase
+        .from('email_templates')
+        .select('subject, html_content, template_key')
+        .eq('template_key', notification.template_key)
+        .eq('is_active', true)
+        .single()
+      
+      if (templateError) {
+        console.error('❌ Error buscando template:', templateError)
+      }
+      
+      if (templateData) {
+        console.log('✅ Template encontrado:', templateData.template_key)
+        template = templateData
+        subject = templateData.subject
+        htmlContent = templateData.html_content
+        templateKey = templateData.template_key
+      } else {
+        console.log('⚠️ No se encontró template con template_key:', notification.template_key)
+      }
+    }
+    // Fallback: buscar por template_id si existe
+    else if (notification.template_id) {
       const { data: templateData } = await supabase
         .from('email_templates')
         .select('subject, html_content, template_key')
@@ -130,21 +158,31 @@ export class NotificationBroadcastService {
         .single()
       
       if (templateData) {
+        console.log('✅ Template encontrado por ID:', templateData.template_key)
         template = templateData
         subject = templateData.subject
         htmlContent = templateData.html_content
-        templateKey = templateData.template_key // Usar el template_key del template
+        templateKey = templateData.template_key
       }
     }
 
-    // Si no hay template, usar contenido básico
+    // Si no hay template, usar contenido del formulario con formato HTML básico
     if (!template) {
-      htmlContent = this.createBasicEmailTemplate(
-        notification.title, 
-        notification.message,
-        notification.cta_text,
-        notification.cta_url
-      )
+      console.log('⚠️ No se encontró template, usando contenido del formulario')
+      // Si el mensaje ya contiene HTML (viene de un template cargado), usarlo directamente
+      if (notification.message.includes('<') && notification.message.includes('>')) {
+        htmlContent = notification.message
+        console.log('✅ Usando HTML del mensaje directamente')
+      } else {
+        // Si es texto plano, crear template básico
+        htmlContent = this.createBasicEmailTemplate(
+          notification.title, 
+          notification.message,
+          notification.cta_text,
+          notification.cta_url
+        )
+        console.log('✅ Creando template básico para texto plano')
+      }
     }
 
     let successCount = 0
@@ -154,10 +192,46 @@ export class NotificationBroadcastService {
     // Enviar emails uno por uno (en producción real, usar queue/batch)
     for (const user of users) {
       try {
+        // Preparar fecha de expiración 
+        let formattedExpiration = 'próximamente'
+        
+        // Si el usuario tiene fecha de expiración en su perfil, usarla
+        if (user.subscription_expires_at) {
+          const expDate = new Date(user.subscription_expires_at)
+          formattedExpiration = expDate.toLocaleDateString('es-ES', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          })
+        } else {
+          // Si no tiene, calcular 30 días desde hoy
+          const expirationDate = new Date()
+          expirationDate.setDate(expirationDate.getDate() + 30)
+          formattedExpiration = expirationDate.toLocaleDateString('es-ES', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          })
+        }
+
+        // URL de pago - ajustar según el estado de la suscripción
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://esteticaprohub.com'
+        let paymentUrl = `${baseUrl}/pricing`
+        
+        // Si el usuario tiene suscripción con problemas, llevarlo a gestionar suscripción
+        if (user.subscription_status === 'suspended' || 
+            user.subscription_status === 'payment_failed' ||
+            user.subscription_status === 'Payment_Failed' ||
+            user.subscription_status === 'Suspended') {
+          paymentUrl = `${baseUrl}/dashboard/subscription`
+        }
+
         // Reemplazar variables en template
         const personalizedHtml = this.replaceVariables(htmlContent, {
           nombre: user.full_name || 'Usuario',
-          email: user.email
+          email: user.email,
+          fecha_expiracion: formattedExpiration,
+          payment_url: paymentUrl
         })
 
         const personalizedSubject = this.replaceVariables(subject, {
@@ -262,9 +336,20 @@ export class NotificationBroadcastService {
     let result = content
     
     Object.entries(variables).forEach(([key, value]) => {
+      // Reemplazar con case-sensitive
       const regex = new RegExp(`{{${key}}}`, 'g')
       result = result.replace(regex, value)
+      
+      // También reemplazar variaciones comunes (lowercase, uppercase, etc)
+      const regexLower = new RegExp(`{{${key.toLowerCase()}}}`, 'gi')
+      result = result.replace(regexLower, value)
     })
+    
+    // Log para debug
+    const remainingVars = result.match(/{{([^}]+)}}/g)
+    if (remainingVars) {
+      console.log('⚠️ Variables no reemplazadas:', remainingVars)
+    }
     
     return result
   }

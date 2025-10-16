@@ -141,10 +141,16 @@ export default function BroadcastComposer() {
 
     setSending(true)
     try {
-      // Obtener el template_key si hay uno seleccionado
+       // Obtener el template_key si hay uno seleccionado
       const selectedTemplateData = selectedTemplate 
         ? templates.find(t => t.id === selectedTemplate)
         : null
+
+      console.log('📤 Enviando broadcast con template:', {
+        selectedTemplate,
+        template_key: selectedTemplateData?.template_key,
+        hasHtml: form.message.includes('<')
+      })
 
       // Adaptar el formato al que espera el API
       const payload = {
@@ -155,11 +161,14 @@ export default function BroadcastComposer() {
         cta_text: form.cta_text,
         cta_url: form.cta_url,
         template_key: selectedTemplateData?.template_key || null, // Enviar template_key si existe
+        template_id: selectedTemplate || null, // También enviar el ID por si acaso
         audience: {
           type: form.audience,
           filter: form.country || form.specialty || undefined
         }
       }
+
+      console.log('📤 Payload completo:', payload)
 
       const response = await fetch('/api/admin/notifications/broadcast', {
         method: 'POST',
