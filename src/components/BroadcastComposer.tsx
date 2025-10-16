@@ -34,6 +34,7 @@ export default function BroadcastComposer() {
   const [templates, setTemplates] = useState<any[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const [loadingTemplates, setLoadingTemplates] = useState(true)
+  const [loadingTemplateContent, setLoadingTemplateContent] = useState(false)
   
 
   // Obtener preview de audiencia cuando cambian los filtros
@@ -41,6 +42,15 @@ export default function BroadcastComposer() {
   useEffect(() => {
     fetchTemplates()
   }, [])
+
+  // Cargar template automáticamente cuando se selecciona
+  useEffect(() => {
+    if (selectedTemplate) {
+      loadTemplate(selectedTemplate)
+    }
+  }, [selectedTemplate])
+
+
   useEffect(() => {
     if (form.audience) {
       fetchAudiencePreview()
@@ -65,18 +75,34 @@ export default function BroadcastComposer() {
     }
   }
 
-  const loadTemplate = async () => {
-    if (!selectedTemplate) return
+  const loadTemplate = async (templateId: string) => {
+    if (!templateId) return
     
-    const template = templates.find(t => t.id === selectedTemplate)
-    if (!template) return
-
-    // Cargar el contenido del template al formulario
-    setForm({
-      ...form,
-      title: template.subject || form.title,
-      message: template.html_content || form.message
-    })
+    setLoadingTemplateContent(true)
+    try {
+      const response = await fetch(`/api/admin/notifications/templates/${templateId}`)
+      if (response.ok) {
+        const result = await response.json()
+        const template = result.data
+        
+        if (template) {
+          // Cargar el contenido del template al formulario
+          setForm({
+            ...form,
+            title: template.subject || form.title,
+            message: template.html_content || form.message
+          })
+        }
+      } else {
+        console.error('Error loading template:', await response.text())
+        alert('Error al cargar el template')
+      }
+    } catch (error) {
+      console.error('Error loading template:', error)
+      alert('Error al cargar el template')
+    } finally {
+      setLoadingTemplateContent(false)
+    }
   }
 
   const fetchAudiencePreview = async () => {
@@ -304,32 +330,28 @@ export default function BroadcastComposer() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   📋 Usar Template Existente (Opcional)
                 </label>
-                <div className="flex space-x-2">
-                  <select
-                    value={selectedTemplate}
-                    onChange={(e) => setSelectedTemplate(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    disabled={loadingTemplates}
-                  >
-                    <option value="">Seleccionar template...</option>
-                    {templates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.template_key} - {template.subject}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={loadTemplate}
-                    disabled={!selectedTemplate}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Cargar
-                  </button>
-                </div>
-                {selectedTemplate && (
-                  <p className="text-xs text-gray-600 mt-2">
-                    💡 Al cargar el template, su contenido reemplazará el título y mensaje actual
+                <select
+                  value={selectedTemplate}
+                  onChange={(e) => setSelectedTemplate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={loadingTemplates || loadingTemplateContent}
+                >
+                  <option value="">Seleccionar template...</option>
+                  {templates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.template_key} - {template.subject}
+                    </option>
+                  ))}
+                </select>
+                {loadingTemplateContent && (
+                  <p className="text-xs text-blue-600 mt-2 flex items-center">
+                    <span className="animate-spin mr-2">⏳</span>
+                    Cargando contenido del template...
+                  </p>
+                )}
+                {selectedTemplate && !loadingTemplateContent && (
+                  <p className="text-xs text-green-600 mt-2">
+                    ✅ Template cargado correctamente
                   </p>
                 )}
               </div>
@@ -468,7 +490,16 @@ export default function BroadcastComposer() {
                 </div>
                 
                 <h4 className="font-semibold text-gray-900 mb-2">{form.title}</h4>
-                <p className="text-gray-700 mb-3">{form.message}</p>
+                <div className="text-gray-700 mb-3">
+                  {form.message.includes('<') && form.message.includes('>') ? (
+                    <div 
+                      dangerouslySetInnerHTML={{ __html: form.message }}
+                      className="prose prose-sm max-w-none"
+                    />
+                  ) : (
+                    <p>{form.message}</p>
+                  )}
+                </div>
                 
                 {form.cta_text && form.cta_url && (
                   <a

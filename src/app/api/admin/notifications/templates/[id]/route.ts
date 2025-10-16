@@ -1,6 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 
+// GET - Obtener un template especÃ­fico por ID
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  try {
+    const supabase = await createServerSupabaseAdminClient()
+
+    const { data: template, error } = await supabase
+      .from('email_templates')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error) {
+      return NextResponse.json(
+        { data: null, error: error.message },
+        { status: 500 }
+      )
+    }
+
+    if (!template) {
+      return NextResponse.json(
+        { data: null, error: 'Template no encontrado' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({
+      data: template,
+      error: null
+    })
+
+  } catch (error) {
+    return NextResponse.json(
+      { data: null, error: 'Error interno del servidor' },
+      { status: 500 }
+    )
+  }
+}
+
 // PUT - Actualizar template
 export async function PUT(
   request: NextRequest,
