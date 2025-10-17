@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
       
       try {
         paypalResults = await updateMultipleSubscriptionsPrices(
-          activeSubscriptions.map(sub => ({
+          activeSubscriptions.map((sub: { id: string; paypal_subscription_id: string | null }) => ({
             id: sub.id,
             paypal_subscription_id: sub.paypal_subscription_id!
           })),
