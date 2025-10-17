@@ -36,14 +36,14 @@ export async function POST(request: NextRequest) {
       .select('user_id, profiles!inner(id, email, full_name)')
       .eq('email_content', true)
 
-    const recipients = preferences?.map(pref => {
+    const recipients = preferences?.map((pref: any) => {
       const profile = Array.isArray(pref.profiles) ? pref.profiles[0] : pref.profiles
       return {
         user_id: pref.user_id,
         email: profile?.email,
         full_name: profile?.full_name
       }
-    }).filter(r => r.email) || []
+    }).filter((r: any) => r.email) || []
 
     console.log('📧 Recipients encontrados:', recipients.length)
     console.log('📧 Recipients:', recipients)
@@ -77,15 +77,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Obtener información de autores
-    const authorIds = posts.map(p => p.author_id)
+    const authorIds = posts.map((p: any) => p.author_id)
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, full_name, email')
       .in('id', authorIds)
 
-    const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
+    const profileMap = new Map(profiles?.map((p: any) => [p.id, p]) || [])
     
-    const postsWithProfiles = posts.map(post => ({
+    const postsWithProfiles = posts.map((post: any) => ({
       ...post,
       profiles: profileMap.get(post.author_id)
     }))
@@ -170,7 +170,7 @@ async function sendNewsletterToRecipients(recipients: any[], posts: any[], subje
 
       // Reemplazar variables manualmente (sin función externa)
       const userName = recipient.full_name || recipient.email?.split('@')[0] || 'Usuario'
-      const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/perfil`
+      const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '')}/perfil`
 
       finalHtml = finalHtml
         .replace(/{{nombre}}/g, userName)
@@ -247,9 +247,9 @@ async function sendNewsletterToRecipients(recipients: any[], posts: any[], subje
 
 // Función para generar HTML de posts para newsletter
 function generatePostsHtml(posts: any[]): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://esteticaprohub.com'
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://esteticaprohub.com').replace(/\/$/, '')
 
-  return posts.map(post => {
+  return posts.map((post: any) => {
     const profile = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles
     const excerpt = post.content?.replace(/<[^>]*>/g, '').substring(0, 150) + '...'
     const postUrl = `${baseUrl}/post/${post.id}`
