@@ -7,10 +7,26 @@ export async function POST(request: NextRequest) {
     const body: BroadcastNotificationRequest = await request.json()
 
     // Validación básica
-    if (!body.title || !body.message || !body.type || !body.category) {
+    if (!body.title || !body.type || !body.category) {
       return NextResponse.json<ApiResponse<null>>({
         data: null,
-        error: 'Faltan campos requeridos: title, message, type, category'
+        error: 'Faltan campos requeridos: title, type, category'
+      }, { status: 400 })
+    }
+
+    // Validar que message exista si se envía in_app
+    if ((body.type === 'in_app' || body.type === 'both') && !body.message) {
+      return NextResponse.json<ApiResponse<null>>({
+        data: null,
+        error: 'El campo message es requerido para notificaciones in-app'
+      }, { status: 400 })
+    }
+
+    // Validar que email_content o template exista si se envía email
+    if ((body.type === 'email' || body.type === 'both') && !body.email_content && !body.template_key && !body.template_id) {
+      return NextResponse.json<ApiResponse<null>>({
+        data: null,
+        error: 'Se requiere email_content o un template para enviar emails'
       }, { status: 400 })
     }
 

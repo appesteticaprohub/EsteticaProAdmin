@@ -111,7 +111,7 @@ export class NotificationBroadcastService {
   // Enviar emails masivos
   static async sendBroadcastEmails(
     users: Profile[],
-    notification: Pick<BroadcastNotificationRequest, 'title' | 'message' | 'category' | 'template_id' | 'template_key' | 'cta_text' | 'cta_url'>
+    notification: Pick<BroadcastNotificationRequest, 'title' | 'message' | 'email_content' | 'category' | 'template_id' | 'template_key' | 'cta_text' | 'cta_url'>
   ): Promise<{ success: number; failed: number }> {
     const supabase = await createServerSupabaseAdminClient()
     
@@ -166,18 +166,22 @@ export class NotificationBroadcastService {
       }
     }
 
-    // Si no hay template, usar contenido del formulario con formato HTML básico
+    // Si no hay template, usar email_content del formulario
     if (!template) {
       console.log('⚠️ No se encontró template, usando contenido del formulario')
-      // Si el mensaje ya contiene HTML (viene de un template cargado), usarlo directamente
-      if (notification.message.includes('<') && notification.message.includes('>')) {
-        htmlContent = notification.message
-        console.log('✅ Usando HTML del mensaje directamente')
+      
+      // Priorizar email_content si existe
+      const contentToUse = notification.email_content || notification.message
+      
+      // Si el contenido ya contiene HTML, usarlo directamente
+      if (contentToUse.includes('<') && contentToUse.includes('>')) {
+        htmlContent = contentToUse
+        console.log('✅ Usando HTML del email_content/message directamente')
       } else {
         // Si es texto plano, crear template básico
         htmlContent = this.createBasicEmailTemplate(
           notification.title, 
-          notification.message,
+          contentToUse,
           notification.cta_text,
           notification.cta_url
         )

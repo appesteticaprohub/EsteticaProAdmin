@@ -35,6 +35,9 @@ export default function BroadcastComposer() {
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const [loadingTemplates, setLoadingTemplates] = useState(true)
   const [loadingTemplateContent, setLoadingTemplateContent] = useState(false)
+  const [useTemplate, setUseTemplate] = useState(false)
+  const [emailContent, setEmailContent] = useState('')
+  const [inAppMessage, setInAppMessage] = useState('')
   
 
   // Obtener preview de audiencia cuando cambian los filtros
@@ -43,12 +46,12 @@ export default function BroadcastComposer() {
     fetchTemplates()
   }, [])
 
-  // Cargar template automáticamente cuando se selecciona
+  // Cargar template solo cuando el usuario lo confirma
   useEffect(() => {
-    if (selectedTemplate) {
+    if (selectedTemplate && useTemplate) {
       loadTemplate(selectedTemplate)
     }
-  }, [selectedTemplate])
+  }, [selectedTemplate, useTemplate])
 
 
   useEffect(() => {
@@ -86,11 +89,12 @@ export default function BroadcastComposer() {
         const template = result.data
         
         if (template) {
-          // Cargar el contenido del template al formulario
+          // Cargar el contenido del template SOLO al emailContent
+          setEmailContent(template.html_content || '')
+          // El título se puede compartir
           setForm({
             ...form,
-            title: template.subject || form.title,
-            message: template.html_content || form.message
+            title: template.subject || form.title
           })
         }
       } else {
@@ -137,7 +141,22 @@ export default function BroadcastComposer() {
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.title || !form.message) return
+    
+    // Validaciones según el tipo
+    if (!form.title) {
+      alert('El título es requerido')
+      return
+    }
+
+    if ((form.type === 'in_app' || form.type === 'both') && !inAppMessage) {
+      alert('El mensaje para notificación in-app es requerido')
+      return
+    }
+
+    if ((form.type === 'email' || form.type === 'both') && !useTemplate && !form.message) {
+      alert('El mensaje para email es requerido o selecciona un template')
+      return
+    }
 
     setSending(true)
     try {
@@ -146,22 +165,28 @@ export default function BroadcastComposer() {
         ? templates.find(t => t.id === selectedTemplate)
         : null
 
-      console.log('📤 Enviando broadcast con template:', {
+      console.log('📤 Enviando broadcast:', {
+        type: form.type,
+        useTemplate,
         selectedTemplate,
         template_key: selectedTemplateData?.template_key,
-        hasHtml: form.message.includes('<')
+        hasEmailContent: !!emailContent,
+        hasInAppMessage: !!inAppMessage
       })
 
       // Adaptar el formato al que espera el API
       const payload = {
         type: form.type,
-        category: form.priority, // priority -> category
+        category: form.priority,
         title: form.title,
-        message: form.message,
+        // Mensaje para notificación in-app (siempre texto plano)
+        message: inAppMessage || form.message,
+        // Contenido para email (HTML del template o mensaje del formulario)
+        email_content: useTemplate && emailContent ? emailContent : form.message,
         cta_text: form.cta_text,
         cta_url: form.cta_url,
-        template_key: selectedTemplateData?.template_key || null, // Enviar template_key si existe
-        template_id: selectedTemplate || null, // También enviar el ID por si acaso
+        template_key: selectedTemplateData?.template_key || null,
+        template_id: selectedTemplate || null,
         audience: {
           type: form.audience,
           filter: form.country || form.specialty || undefined
@@ -191,6 +216,10 @@ export default function BroadcastComposer() {
           title: '',
           message: ''
         })
+        setInAppMessage('')
+        setEmailContent('')
+        setSelectedTemplate('')
+        setUseTemplate(false)
         setShowPreview(false)
       } else {
         const error = await response.json()
@@ -334,36 +363,64 @@ export default function BroadcastComposer() {
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Contenido del Mensaje</h3>
               
-              {/* Selector de templates */}
-              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  📋 Usar Template Existente (Opcional)
-                </label>
-                <select
-                  value={selectedTemplate}
-                  onChange={(e) => setSelectedTemplate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  disabled={loadingTemplates || loadingTemplateContent}
-                >
-                  <option value="">Seleccionar template...</option>
-                  {templates.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.template_key} - {template.subject}
-                    </option>
-                  ))}
-                </select>
-                {loadingTemplateContent && (
-                  <p className="text-xs text-blue-600 mt-2 flex items-center">
-                    <span className="animate-spin mr-2">⏳</span>
-                    Cargando contenido del template...
-                  </p>
-                )}
-                {selectedTemplate && !loadingTemplateContent && (
-                  <p className="text-xs text-green-600 mt-2">
-                    ✅ Template cargado correctamente
-                  </p>
-                )}
-              </div>
+              {/* Selector de templates - Solo para emails */}
+              {(form.type === 'email' || form.type === 'both') && (
+                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center mb-3">
+                    <input
+                      type="checkbox"
+                      id="useTemplate"
+                      checked={useTemplate}
+                      onChange={(e) => {
+                        setUseTemplate(e.target.checked)
+                        if (!e.target.checked) {
+                        setSelectedTemplate('')
+                        setEmailContent('')
+                      }
+                      }}
+                      className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="useTemplate" className="text-sm font-medium text-gray-700">
+                      📋 Usar Template de Email (Opcional)
+                    </label>
+                  </div>
+                  
+                  {useTemplate && (
+                    <>
+                      <select
+                        value={selectedTemplate}
+                        onChange={(e) => setSelectedTemplate(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        disabled={loadingTemplates || loadingTemplateContent}
+                      >
+                        <option value="">Seleccionar template...</option>
+                        {templates.map((template) => (
+                          <option key={template.id} value={template.id}>
+                            {template.template_key} - {template.subject}
+                          </option>
+                        ))}
+                      </select>
+                      {loadingTemplateContent && (
+                        <p className="text-xs text-blue-600 mt-2 flex items-center">
+                          <span className="animate-spin mr-2">⏳</span>
+                          Cargando contenido del template...
+                        </p>
+                      )}
+                      {selectedTemplate && !loadingTemplateContent && (
+                        <p className="text-xs text-green-600 mt-2">
+                          ✅ Template cargado correctamente
+                        </p>
+                      )}
+                    </>
+                  )}
+                  
+                  {!useTemplate && (
+                    <p className="text-xs text-gray-600 mt-2">
+                      💡 Puedes escribir tu propio contenido sin usar un template. El sistema creará un email básico automáticamente.
+                    </p>
+                  )}
+                </div>
+              )}
               
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -379,19 +436,63 @@ export default function BroadcastComposer() {
                 />
               </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Mensaje *
-                </label>
-                <textarea
-                  value={form.message}
-                  onChange={(e) => setForm({ ...form, message: e.target.value })}
-                  placeholder="Contenido del mensaje"
-                  rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
+              {/* Mensaje para In-App */}
+              {(form.type === 'in_app' || form.type === 'both') && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Mensaje para Notificación In-App *
+                  </label>
+                  <textarea
+                    value={inAppMessage}
+                    onChange={(e) => setInAppMessage(e.target.value)}
+                    placeholder="Mensaje que aparecerá en las notificaciones dentro de la app (texto plano)"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Este mensaje aparecerá en el panel de notificaciones de la aplicación
+                  </p>
+                </div>
+              )}
+
+              {/* Mensaje/Contenido para Email */}
+              {(form.type === 'email' || form.type === 'both') && !useTemplate && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Mensaje para Email *
+                  </label>
+                  <textarea
+                    value={form.message}
+                    onChange={(e) => setForm({ ...form, message: e.target.value })}
+                    placeholder="Contenido del email (puede incluir HTML básico)"
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Este contenido se enviará por email. Puedes usar HTML básico.
+                  </p>
+                </div>
+              )}
+
+              {/* Preview del template de email si está usando uno */}
+              {(form.type === 'email' || form.type === 'both') && useTemplate && emailContent && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Preview del Template de Email
+                  </label>
+                  <div className="p-4 bg-gray-50 border border-gray-300 rounded-lg max-h-60 overflow-y-auto">
+                    <div 
+                      dangerouslySetInnerHTML={{ __html: emailContent }}
+                      className="prose prose-sm max-w-none"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Este es el contenido del template que se enviará por email
+                  </p>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -434,7 +535,7 @@ export default function BroadcastComposer() {
               
               <button
                 type="submit"
-                disabled={sending || !form.title || !form.message}
+                disabled={sending || !form.title}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
               >
                 {sending ? 'Enviando...' : 'Enviar Broadcast'}
@@ -500,13 +601,27 @@ export default function BroadcastComposer() {
                 
                 <h4 className="font-semibold text-gray-900 mb-2">{form.title}</h4>
                 <div className="text-gray-700 mb-3">
-                  {form.message.includes('<') && form.message.includes('>') ? (
-                    <div 
-                      dangerouslySetInnerHTML={{ __html: form.message }}
-                      className="prose prose-sm max-w-none"
-                    />
-                  ) : (
-                    <p>{form.message}</p>
+                  {/* Preview del mensaje in-app */}
+                  {(form.type === 'in_app' || form.type === 'both') && inAppMessage && (
+                    <div className="mb-2">
+                      <p className="text-xs font-semibold text-gray-500 mb-1">In-App:</p>
+                      <p className="text-sm">{inAppMessage}</p>
+                    </div>
+                  )}
+                  
+                  {/* Preview del email */}
+                  {(form.type === 'email' || form.type === 'both') && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 mb-1">Email:</p>
+                      {useTemplate && emailContent ? (
+                        <div 
+                          dangerouslySetInnerHTML={{ __html: emailContent.substring(0, 200) + '...' }}
+                          className="prose prose-sm max-w-none text-xs"
+                        />
+                      ) : form.message ? (
+                        <p className="text-sm">{form.message.substring(0, 200)}{form.message.length > 200 ? '...' : ''}</p>
+                      ) : null}
+                    </div>
                   )}
                 </div>
                 

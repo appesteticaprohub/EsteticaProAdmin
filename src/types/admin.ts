@@ -48,7 +48,8 @@ export interface BroadcastNotificationRequest {
   type: 'email' | 'in_app' | 'both'
   category: 'critical' | 'important' | 'normal' | 'promotional'
   title: string
-  message: string
+  message: string // Para notificaciones in-app (texto plano)
+  email_content?: string // Para emails (HTML del template o contenido personalizado)
   cta_text?: string
   cta_url?: string
   audience: BroadcastAudience
