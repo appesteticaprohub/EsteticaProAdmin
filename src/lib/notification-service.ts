@@ -36,6 +36,12 @@ export class NotificationBroadcastService {
           query = query.eq('specialty', audience.filter)
         }
         break
+      case 'by_email_list':
+        if (audience.email_list && audience.email_list.length > 0) {
+          // Filtrar por lista específica de emails
+          query = query.in('email', audience.email_list)
+        }
+        break
       case 'all':
       default:
         // Sin filtros adicionales

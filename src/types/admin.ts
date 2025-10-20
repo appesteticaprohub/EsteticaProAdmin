@@ -73,8 +73,9 @@ export interface NewsletterSendRequest {
 
 // Tipos para broadcast masivo
 export interface BroadcastAudience {
-  type: 'all' | 'active' | 'inactive' | 'by_country' | 'by_specialty'
+  type: 'all' | 'active' | 'inactive' | 'by_country' | 'by_specialty' | 'by_email_list'
   filter?: string
+  email_list?: string[] // Lista de emails específicos
   count?: number
 }
 

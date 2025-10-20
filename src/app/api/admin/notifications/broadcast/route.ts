@@ -54,11 +54,11 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    const validAudienceTypes = ['all', 'active', 'inactive', 'by_country', 'by_specialty']
+    const validAudienceTypes = ['all', 'active', 'inactive', 'by_country', 'by_specialty', 'by_email_list']
     if (!validAudienceTypes.includes(body.audience.type)) {
       return NextResponse.json<ApiResponse<null>>({
         data: null,
-        error: 'Tipo de audiencia debe ser: all, active, inactive, by_country o by_specialty'
+        error: 'Tipo de audiencia debe ser: all, active, inactive, by_country, by_specialty o by_email_list'
       }, { status: 400 })
     }
 
@@ -67,6 +67,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json<ApiResponse<null>>({
         data: null,
         error: `Filtro es requerido para audiencia tipo ${body.audience.type}`
+      }, { status: 400 })
+    }
+
+    // Validar lista de emails si el tipo es by_email_list
+    if (body.audience.type === 'by_email_list' && (!body.audience.email_list || body.audience.email_list.length === 0)) {
+      return NextResponse.json<ApiResponse<null>>({
+        data: null,
+        error: 'Lista de emails es requerida para audiencia tipo by_email_list'
       }, { status: 400 })
     }
 
@@ -102,7 +110,7 @@ export async function GET(request: NextRequest) {
       }, { status: 400 })
     }
 
-    const validAudienceTypes = ['all', 'active', 'inactive', 'by_country', 'by_specialty']
+    const validAudienceTypes = ['all', 'active', 'inactive', 'by_country', 'by_specialty', 'by_email_list']
     if (!validAudienceTypes.includes(audienceType)) {
       return NextResponse.json<ApiResponse<null>>({
         data: null,
@@ -110,9 +118,19 @@ export async function GET(request: NextRequest) {
       }, { status: 400 })
     }
 
+    // Para by_email_list, obtener la lista de emails del query param
+    let emailList: string[] | undefined = undefined
+    if (audienceType === 'by_email_list') {
+      const emailsParam = searchParams.get('email_list')
+      if (emailsParam) {
+        emailList = emailsParam.split(',').map(e => e.trim()).filter(e => e.length > 0)
+      }
+    }
+
     const audience = {
       type: audienceType as any,
-      filter: audienceFilter || undefined
+      filter: audienceFilter || undefined,
+      email_list: emailList
     }
 
     const count = await NotificationBroadcastService.getAudienceCount(audience)

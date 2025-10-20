@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 
 interface BroadcastForm {
   type: 'email' | 'in_app' | 'both'
-  audience: 'all' | 'active' | 'inactive' | 'by_country' | 'by_specialty'
+  audience: 'all' | 'active' | 'inactive' | 'by_country' | 'by_specialty' | 'by_email_list'
   country?: string
   specialty?: string
   priority: 'normal' | 'important' | 'critical' | 'promotional'
@@ -38,6 +38,7 @@ export default function BroadcastComposer() {
   const [useTemplate, setUseTemplate] = useState(false)
   const [emailContent, setEmailContent] = useState('')
   const [inAppMessage, setInAppMessage] = useState('')
+  const [emailList, setEmailList] = useState('')
   
 
   // Obtener preview de audiencia cuando cambian los filtros
@@ -58,7 +59,7 @@ export default function BroadcastComposer() {
     if (form.audience) {
       fetchAudiencePreview()
     }
-  }, [form.audience, form.country, form.specialty])
+  }, [form.audience, form.country, form.specialty, emailList])
 
   const fetchTemplates = async () => {
     setLoadingTemplates(true)
@@ -120,6 +121,16 @@ export default function BroadcastComposer() {
         params.append('audience_filter', form.country)
       } else if (form.specialty) {
         params.append('audience_filter', form.specialty)
+      } else if (form.audience === 'by_email_list' && emailList.trim()) {
+        // Parsear la lista de emails y enviarla como parámetro
+        const emails = emailList
+          .split(/[\n,]/) // Separar por comas o saltos de línea
+          .map(e => e.trim())
+          .filter(e => e.length > 0)
+        
+        if (emails.length > 0) {
+          params.append('email_list', emails.join(','))
+        }
       }
 
       const response = await fetch(`/api/admin/notifications/broadcast?${params}`)
@@ -175,6 +186,20 @@ export default function BroadcastComposer() {
       })
 
       // Adaptar el formato al que espera el API
+      // Parsear la lista de emails si el tipo de audiencia es by_email_list
+      let parsedEmailList: string[] | undefined = undefined
+      if (form.audience === 'by_email_list' && emailList.trim()) {
+        parsedEmailList = emailList
+          .split(/[\n,]/) // Separar por comas o saltos de línea
+          .map(e => e.trim())
+          .filter(e => e.length > 0 && e.includes('@')) // Validar que sea un email
+        
+        if (parsedEmailList.length === 0) {
+          alert('Por favor ingresa al menos un email válido')
+          return
+        }
+      }
+
       const payload = {
         type: form.type,
         category: form.priority,
@@ -189,7 +214,8 @@ export default function BroadcastComposer() {
         template_id: selectedTemplate || null,
         audience: {
           type: form.audience,
-          filter: form.country || form.specialty || undefined
+          filter: form.country || form.specialty || undefined,
+          email_list: parsedEmailList
         }
       }
 
@@ -217,6 +243,7 @@ export default function BroadcastComposer() {
           message: ''
         })
         setInAppMessage('')
+        setEmailList('')
         setEmailContent('')
         setSelectedTemplate('')
         setUseTemplate(false)
@@ -307,6 +334,7 @@ export default function BroadcastComposer() {
                   <option value="inactive">Suscripciones inactivas</option>
                   <option value="by_country">Por país</option>
                   <option value="by_specialty">Por especialidad</option>
+                  <option value="by_email_list">Usuarios específicos (por email)</option>
                 </select>
               </div>
 
@@ -338,6 +366,36 @@ export default function BroadcastComposer() {
                     placeholder="Ej: Dermatología, Cirugía Plástica"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
+                </div>
+              )}
+
+              {form.audience === 'by_email_list' && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Lista de Emails
+                  </label>
+                  <textarea
+                    value={emailList}
+                    onChange={(e) => setEmailList(e.target.value)}
+                    placeholder="usuario1@ejemplo.com, usuario2@ejemplo.com&#10;usuario3@ejemplo.com"
+                    rows={5}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                  />
+                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800 font-medium mb-1">
+                      💡 Cómo usar este campo:
+                    </p>
+                    <ul className="text-xs text-blue-700 space-y-1 ml-4 list-disc">
+                      <li>Puedes pegar una lista de emails separados por <strong>comas</strong> o <strong>saltos de línea</strong></li>
+                      <li>Ejemplo: <code className="bg-blue-100 px-1 rounded">email1@ejemplo.com, email2@ejemplo.com</code></li>
+                      <li>O uno por línea:<br/>
+                        <code className="bg-blue-100 px-1 rounded">email1@ejemplo.com</code><br/>
+                        <code className="bg-blue-100 px-1 rounded">email2@ejemplo.com</code>
+                      </li>
+                      <li>Los espacios adicionales se eliminarán automáticamente</li>
+                      <li>Solo se enviarán a usuarios registrados en la plataforma</li>
+                    </ul>
+                  </div>
                 </div>
               )}
 
