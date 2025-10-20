@@ -431,7 +431,7 @@ export class NotificationBroadcastService {
       const notifications = users.map((user: UserForNotification) => ({
         user_id: user.id,
         type: 'in_app' as const,
-        category: 'critical' as const,
+        category: 'important' as const,
         title: 'Actualización de Precios',
         message: `El precio de suscripción ha sido actualizado a $${newPrice}. Este cambio será efectivo para nuevas suscripciones y renovaciones.`,
         cta_text: null,
