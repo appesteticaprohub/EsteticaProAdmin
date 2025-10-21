@@ -145,3 +145,126 @@ export async function GET(
     )
   }
 }
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Verificar que el usuario autenticado es admin
+    const supabaseAuth = await createServerSupabaseClient()
+    const { data: { user: adminUser }, error: authError } = await supabaseAuth.auth.getUser()
+
+    if (authError || !adminUser) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - No active session' },
+        { status: 401 }
+      )
+    }
+
+    const { data: adminProfile, error: adminError } = await supabaseAuth
+      .from('profiles')
+      .select('role')
+      .eq('id', adminUser.id)
+      .single()
+
+    if (adminError || !adminProfile || adminProfile.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden - Admin access required' },
+        { status: 403 }
+      )
+    }
+
+    const { id: postId } = await params
+    const body = await request.json()
+    const { category } = body
+
+    // Validar que se envió una categoría
+    if (!category) {
+      return NextResponse.json(
+        { success: false, error: 'Category is required' },
+        { status: 400 }
+      )
+    }
+
+    // Validar que la categoría es válida
+    const validCategories = [
+      'casos-clinicos',
+      'complicaciones',
+      'tendencias-facial',
+      'tendencias-corporal',
+      'tendencias-capilar',
+      'tendencias-spa',
+      'gestion-empresarial'
+    ]
+
+    if (!validCategories.includes(category)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid category' },
+        { status: 400 }
+      )
+    }
+
+    const supabase = createServerSupabaseAdminClient()
+
+    // Verificar que el post existe
+    const { data: existingPost, error: checkError } = await supabase
+      .from('posts')
+      .select('id, category, title, author_id')
+      .eq('id', postId)
+      .single()
+
+    if (checkError || !existingPost) {
+      return NextResponse.json(
+        { success: false, error: 'Post not found' },
+        { status: 404 }
+      )
+    }
+
+    // Actualizar la categoría del post
+    const { error: updateError } = await supabase
+      .from('posts')
+      .update({ category })
+      .eq('id', postId)
+
+    if (updateError) {
+      console.error('Error updating post category:', updateError)
+      return NextResponse.json(
+        { success: false, error: 'Failed to update category' },
+        { status: 500 }
+      )
+    }
+
+    // Registrar en moderation_logs
+    await supabase
+      .from('moderation_logs')
+      .insert({
+        admin_id: adminUser.id,
+        action_type: 'recategorize_post',
+        target_type: 'post',
+        target_id: postId,
+        reason: `Categoría cambiada de "${existingPost.category || 'sin categoría'}" a "${category}"`,
+        metadata: {
+          old_category: existingPost.category,
+          new_category: category,
+          post_title: existingPost.title,
+          post_author_id: existingPost.author_id
+        }
+      })
+
+    return NextResponse.json({
+      success: true,
+      message: 'Category updated successfully'
+    })
+
+  } catch (error) {
+    console.error('Error in PATCH endpoint:', error)
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Internal server error' 
+      },
+      { status: 500 }
+    )
+  }
+}

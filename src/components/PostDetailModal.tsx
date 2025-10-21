@@ -33,6 +33,10 @@ export default function PostDetailModal({
   // Estados para acciones
   const [actionLoading, setActionLoading] = useState(false)
 
+  // Estados para recategorización
+  const [isEditingCategory, setIsEditingCategory] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState('')
+
   useEffect(() => {
     if (isOpen && postId) {
       fetchPostDetail()
@@ -153,6 +157,52 @@ export default function PostDetailModal({
     }
   }
 
+  const handleUpdateCategory = async () => {
+    if (!postDetail || !selectedCategory) return
+
+    if (!confirm(`¿Estás seguro de cambiar la categoría a "${getCategoryLabel(selectedCategory)}"?`)) {
+      return
+    }
+
+    try {
+      setActionLoading(true)
+      const response = await fetch(`/api/admin/moderation/posts/${postId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: selectedCategory })
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        alert('Categoría actualizada exitosamente')
+        setIsEditingCategory(false)
+        fetchPostDetail() // Recargar datos
+        onPostUpdated?.()
+      } else {
+        alert('Error al actualizar categoría: ' + (result.error || 'Error desconocido'))
+      }
+    } catch (err) {
+      alert('Error al actualizar la categoría')
+      console.error(err)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const getCategoryLabel = (value: string) => {
+    const categories = [
+      { value: 'casos-clinicos', label: 'Casos Clínicos' },
+      { value: 'complicaciones', label: 'Complicaciones' },
+      { value: 'tendencias-facial', label: 'Tendencias Facial' },
+      { value: 'tendencias-corporal', label: 'Tendencias Corporal' },
+      { value: 'tendencias-capilar', label: 'Tendencias Capilar' },
+      { value: 'tendencias-spa', label: 'Tendencias Spa' },
+      { value: 'gestion-empresarial', label: 'Gestión Empresarial' }
+    ]
+    return categories.find(cat => cat.value === value)?.label || value
+  }
+
   const handleBanUser = async (reason: string) => {
     if (!postDetail) return
 
@@ -245,10 +295,63 @@ export default function PostDetailModal({
                         <h2 className="text-2xl font-bold text-gray-900 mb-2 break-words">
                           {postDetail.post.title}
                         </h2>
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
-                          <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-medium">
-                            {postDetail.post.category || 'Sin categoría'}
-                          </span>
+                        <div className="flex items-start gap-4 text-sm text-gray-600">
+                          <div className="flex items-center gap-2">
+                            {!isEditingCategory ? (
+                              <>
+                                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-medium">
+                                  {postDetail.post.category || 'Sin categoría'}
+                                </span>
+                                {!postDetail.post.is_deleted && (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedCategory(postDetail.post.category || '')
+                                      setIsEditingCategory(true)
+                                    }}
+                                    className="text-blue-600 hover:text-blue-800 text-xs underline"
+                                    disabled={actionLoading}
+                                  >
+                                    Cambiar categoría
+                                  </button>
+                                )}
+                              </>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <select
+                                  value={selectedCategory}
+                                  onChange={(e) => setSelectedCategory(e.target.value)}
+                                  className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  disabled={actionLoading}
+                                >
+                                  <option value="">Seleccionar categoría</option>
+                                  <option value="casos-clinicos">Casos Clínicos</option>
+                                  <option value="complicaciones">Complicaciones</option>
+                                  <option value="tendencias-facial">Tendencias Facial</option>
+                                  <option value="tendencias-corporal">Tendencias Corporal</option>
+                                  <option value="tendencias-capilar">Tendencias Capilar</option>
+                                  <option value="tendencias-spa">Tendencias Spa</option>
+                                  <option value="gestion-empresarial">Gestión Empresarial</option>
+                                </select>
+                                <button
+                                  onClick={handleUpdateCategory}
+                                  disabled={actionLoading || !selectedCategory}
+                                  className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-xs"
+                                >
+                                  Guardar
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setIsEditingCategory(false)
+                                    setSelectedCategory('')
+                                  }}
+                                  disabled={actionLoading}
+                                  className="px-3 py-1 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-xs"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            )}
+                          </div>
                           <span>{formatDate(postDetail.post.created_at)}</span>
                           {postDetail.post.is_reviewed && (
                             <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
