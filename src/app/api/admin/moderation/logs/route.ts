@@ -2,6 +2,28 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 import { createServerSupabaseClient } from '@/lib/server-supabase'
 
+// Interfaces para tipar los datos de Supabase
+interface ModerationLogFromDB {
+  id: string
+  admin_id: string
+  action_type: 'ban_user' | 'unban_user' | 'delete_post' | 'delete_comment' | 'approve_post' | 'restore_post' | 'restore_comment'
+  target_type: 'user' | 'post' | 'comment'
+  target_id: string
+  reason: string | null
+  metadata: Record<string, unknown> | null
+  created_at: string
+}
+
+interface AdminFromDB {
+  id: string
+  full_name: string | null
+  email: string
+}
+
+interface ModerationLogWithAdmin extends ModerationLogFromDB {
+  admin: AdminFromDB | null
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Verificar que el usuario autenticado es admin
@@ -87,7 +109,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Obtener información de admins
-    const adminIds = logs?.map((log: any) => log.admin_id).filter(Boolean) || []
+    const adminIds = (logs as ModerationLogFromDB[] | null)?.map((log) => log.admin_id).filter(Boolean) || []
     const uniqueAdminIds = [...new Set(adminIds)]
     
     const { data: admins } = await supabase
@@ -96,9 +118,9 @@ export async function GET(request: NextRequest) {
       .in('id', uniqueAdminIds)
 
     // Mapear admins a logs
-    const logsWithAdmins = logs?.map((log: any) => ({
+    const logsWithAdmins: ModerationLogWithAdmin[] = (logs as ModerationLogFromDB[] | null)?.map((log) => ({
       ...log,
-      admin: admins?.find((a: any) => a.id === log.admin_id) || null
+      admin: (admins as AdminFromDB[] | null)?.find((a) => a.id === log.admin_id) || null
     })) || []
 
     // Calcular paginación
