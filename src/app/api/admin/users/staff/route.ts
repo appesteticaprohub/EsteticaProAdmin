@@ -1,6 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient, createServerSupabaseClient } from '@/lib/server-supabase'
 
+interface StaffUserWithCredentials {
+  id: string
+  email: string
+  full_name: string | null
+  country: string | null
+  specialty: string | null
+  created_at: string
+  user_type: string
+  subscription_status: string
+  staff_credentials?: Array<{
+    password_plain: string
+    created_by: string | null
+    updated_at: string
+  }>
+}
+
 // GET - Listar usuarios staff
 export async function GET(request: NextRequest) {
   try {
@@ -63,7 +79,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Transformar datos para incluir password_plain en el nivel principal
-    const formattedUsers = (staffUsers || []).map((user: any) => ({
+    const formattedUsers = (staffUsers || []).map((user: StaffUserWithCredentials) => ({
       id: user.id,
       email: user.email,
       password_plain: user.staff_credentials?.[0]?.password_plain || '',
