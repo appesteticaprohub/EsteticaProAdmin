@@ -1,6 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+
+interface EmailTemplate {
+  id: string
+  template_key: string
+  subject: string
+  html_content: string
+  is_active: boolean
+  is_system: boolean
+  created_at: string
+}
 
 interface BroadcastForm {
   type: 'email' | 'in_app' | 'both'
@@ -31,7 +41,7 @@ export default function BroadcastComposer() {
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
-  const [templates, setTemplates] = useState<any[]>([])
+  const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const [loadingTemplates, setLoadingTemplates] = useState(true)
   const [loadingTemplateContent, setLoadingTemplateContent] = useState(false)
@@ -39,47 +49,8 @@ export default function BroadcastComposer() {
   const [emailContent, setEmailContent] = useState('')
   const [inAppMessage, setInAppMessage] = useState('')
   const [emailList, setEmailList] = useState('')
-  
 
-  // Obtener preview de audiencia cuando cambian los filtros
-  // Cargar templates disponibles
-  useEffect(() => {
-    fetchTemplates()
-  }, [])
-
-  // Cargar template solo cuando el usuario lo confirma
-  useEffect(() => {
-    if (selectedTemplate && useTemplate) {
-      loadTemplate(selectedTemplate)
-    }
-  }, [selectedTemplate, useTemplate])
-
-
-  useEffect(() => {
-    if (form.audience) {
-      fetchAudiencePreview()
-    }
-  }, [form.audience, form.country, form.specialty, emailList])
-
-  const fetchTemplates = async () => {
-    setLoadingTemplates(true)
-    try {
-      const response = await fetch('/api/admin/notifications/templates')
-      if (response.ok) {
-        const result = await response.json()
-        const data = result.data || result
-        // Filtrar solo templates activos
-        const activeTemplates = (data.templates || []).filter((t: any) => t.is_active)
-        setTemplates(activeTemplates)
-      }
-    } catch (error) {
-      console.error('Error fetching templates:', error)
-    } finally {
-      setLoadingTemplates(false)
-    }
-  }
-
-  const loadTemplate = async (templateId: string) => {
+  const loadTemplate = useCallback(async (templateId: string) => {
     if (!templateId) return
     
     setLoadingTemplateContent(true)
@@ -93,10 +64,10 @@ export default function BroadcastComposer() {
           // Cargar el contenido del template SOLO al emailContent
           setEmailContent(template.html_content || '')
           // El título se puede compartir
-          setForm({
-            ...form,
-            title: template.subject || form.title
-          })
+          setForm((prevForm) => ({
+            ...prevForm,
+            title: template.subject || prevForm.title
+          }))
         }
       } else {
         console.error('Error loading template:', await response.text())
@@ -108,9 +79,9 @@ export default function BroadcastComposer() {
     } finally {
       setLoadingTemplateContent(false)
     }
-  }
+  }, [])
 
-  const fetchAudiencePreview = async () => {
+  const fetchAudiencePreview = useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams({
@@ -147,7 +118,46 @@ export default function BroadcastComposer() {
     } finally {
       setLoading(false)
     }
+  }, [form.audience, form.country, form.specialty, emailList])
+
+  const fetchTemplates = async () => {
+    setLoadingTemplates(true)
+    try {
+      const response = await fetch('/api/admin/notifications/templates')
+      if (response.ok) {
+        const result = await response.json()
+        const data = result.data || result
+        // Filtrar solo templates activos
+        const activeTemplates = (data.templates || []).filter((t: EmailTemplate) => t.is_active)
+        setTemplates(activeTemplates)
+      }
+    } catch (error) {
+      console.error('Error fetching templates:', error)
+    } finally {
+      setLoadingTemplates(false)
+    }
   }
+  
+
+  // Obtener preview de audiencia cuando cambian los filtros
+  // Cargar templates disponibles
+  useEffect(() => {
+    fetchTemplates()
+  }, [])
+
+  // Cargar template solo cuando el usuario lo confirma
+  useEffect(() => {
+    if (selectedTemplate && useTemplate) {
+      loadTemplate(selectedTemplate)
+    }
+  }, [selectedTemplate, useTemplate, loadTemplate])
+
+
+  useEffect(() => {
+    if (form.audience) {
+      fetchAudiencePreview()
+    }
+  }, [form.audience, fetchAudiencePreview])
 
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -309,7 +319,7 @@ export default function BroadcastComposer() {
                         name="type"
                         value={option.value}
                         checked={form.type === option.value}
-                        onChange={(e) => setForm({ ...form, type: e.target.value as any })}
+                        onChange={(e) => setForm({ ...form, type: e.target.value as 'email' | 'in_app' | 'both' })}
                         className="mr-2"
                       />
                       <span className="mr-1">{option.icon}</span>
@@ -326,7 +336,7 @@ export default function BroadcastComposer() {
                 </label>
                 <select
                   value={form.audience}
-                  onChange={(e) => setForm({ ...form, audience: e.target.value as any })}
+                  onChange={(e) => setForm({ ...form, audience: e.target.value as 'all' | 'active' | 'inactive' | 'by_country' | 'by_specialty' | 'by_email_list' })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="all">Todos los usuarios</option>
@@ -406,7 +416,7 @@ export default function BroadcastComposer() {
                 </label>
                 <select
                   value={form.priority}
-                  onChange={(e) => setForm({ ...form, priority: e.target.value as any })}
+                  onChange={(e) => setForm({ ...form, priority: e.target.value as 'normal' | 'important' | 'critical' | 'promotional' })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="normal">Normal</option>
