@@ -1,6 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 
+// Interfaz para tipar los posts de Supabase
+interface PostFromDB {
+  id: string
+  title: string
+  content: string
+  created_at: string
+  views_count: number
+  likes_count: number
+  comments_count: number
+  category: string | null
+  author_id: string
+}
+
+interface ProfileFromDB {
+  id: string
+  full_name: string | null
+  email: string
+}
+
 // GET - Obtener posts disponibles para newsletter
 export async function GET(request: NextRequest) {
   try {
@@ -34,16 +53,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Obtener información de autores
-    const authorIds = posts?.map(p => p.author_id) || []
+    const authorIds = (posts as PostFromDB[] | null)?.map((p) => p.author_id) || []
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, full_name, email')
       .in('id', authorIds)
 
-    const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
+    const profileMap = new Map((profiles as ProfileFromDB[] | null)?.map((p) => [p.id, p]) || [])
 
     // Formatear posts para newsletter
-    const formattedPosts = posts?.map(post => {
+    const formattedPosts = (posts as PostFromDB[] | null)?.map((post) => {
       const profile = profileMap.get(post.author_id)
       
       return {
@@ -68,8 +87,9 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
+    console.error('Error fetching newsletter posts:', error)
     return NextResponse.json(
-      { data: null, error: 'Error interno del servidor' },
+      { data: null, error: error instanceof Error ? error.message : 'Error interno del servidor' },
       { status: 500 }
     )
   }
