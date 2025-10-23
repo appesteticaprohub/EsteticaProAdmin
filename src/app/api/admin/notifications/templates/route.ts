@@ -5,7 +5,6 @@ import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 export async function GET() {
   try {
     const supabase = await createServerSupabaseAdminClient()
-
     const { data: templates, error } = await supabase
       .from('email_templates')
       .select('*')
@@ -22,8 +21,8 @@ export async function GET() {
       templates: templates || [],
       error: null
     })
-
-  } catch (error) {
+  } catch (err) {
+    console.error('Error al obtener templates:', err)
     return NextResponse.json(
       { data: null, error: 'Error interno del servidor' },
       { status: 500 }
@@ -69,8 +68,8 @@ export async function POST(request: NextRequest) {
       data: template,
       error: null
     })
-
-  } catch (error) {
+  } catch (err) {
+    console.error('Error al crear template:', err)
     return NextResponse.json(
       { data: null, error: 'Error interno del servidor' },
       { status: 500 }
