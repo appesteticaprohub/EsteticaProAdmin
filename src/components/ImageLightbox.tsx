@@ -1,5 +1,7 @@
 'use client'
 
+import Image from 'next/image'
+
 interface ImageLightboxProps {
   images: string[]
   currentIndex: number
@@ -52,11 +54,15 @@ export default function ImageLightbox({
       )}
 
       {/* Imagen */}
-      <div className="max-w-7xl max-h-[90vh] p-4">
-        <img
+      <div className="max-w-7xl max-h-[90vh] p-4 relative w-full h-full flex items-center justify-center">
+        <Image
           src={images[currentIndex]}
           alt={`Imagen ${currentIndex + 1}`}
+          width={1200}
+          height={800}
           className="max-w-full max-h-full object-contain"
+          unoptimized
+          priority
         />
       </div>
 
@@ -88,10 +94,13 @@ export default function ImageLightbox({
                 idx === currentIndex ? 'border-white' : 'border-transparent opacity-50'
               }`}
             >
-              <img
+              <Image
                 src={img}
                 alt={`Miniatura ${idx + 1}`}
+                width={64}
+                height={64}
                 className="w-full h-full object-cover"
+                unoptimized
               />
             </button>
           ))}
