@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import { PostsListResponse, PostWithAuthor, PostsFilters, PostsSortOptions } from '@/types/admin'
 import BanUserModal from './BanUserModal'
 import UserHistoryModal from './UserHistoryModal'
@@ -69,8 +70,7 @@ export default function ContentModerationPanel() {
   const [showPostDetailModal, setShowPostDetailModal] = useState(false)
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
 
-  // Fetch posts
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -131,7 +131,7 @@ export default function ContentModerationPanel() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [currentPage, sortOptions, activeFilters])
 
   // Aplicar filtros
   const handleApplyFilters = () => {
@@ -215,7 +215,7 @@ export default function ContentModerationPanel() {
   // Effects
   useEffect(() => {
     fetchPosts()
-  }, [currentPage, activeFilters, sortOptions])
+  }, [fetchPosts])
 
   // Handlers de entrada con Enter
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -420,7 +420,7 @@ export default function ContentModerationPanel() {
           <span className="text-sm font-medium text-gray-700">Ordenar por:</span>
           <select
             value={sortOptions.sortBy}
-            onChange={(e) => setSortOptions({ ...sortOptions, sortBy: e.target.value as any })}
+            onChange={(e) => setSortOptions({ ...sortOptions, sortBy: e.target.value as PostsSortOptions['sortBy'] })}
             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="created_at">Fecha de creación</option>
@@ -545,11 +545,13 @@ export default function ContentModerationPanel() {
 
                   {/* Miniatura */}
                   {post.images && post.images.length > 0 && (
-                    <div className="flex-shrink-0">
-                      <img
+                    <div className="flex-shrink-0 relative w-24 h-24">
+                      <Image
                         src={post.images[0]}
                         alt="Preview"
-                        className="w-24 h-24 object-cover rounded-lg"
+                        fill
+                        className="object-cover rounded-lg"
+                        unoptimized
                       />
                     </div>
                   )}
