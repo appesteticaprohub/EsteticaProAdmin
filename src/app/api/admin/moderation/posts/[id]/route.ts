@@ -2,6 +2,31 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 import { createServerSupabaseClient } from '@/lib/server-supabase'
 
+// Interfaces para tipar los datos de Supabase
+interface CommentFromDB {
+  id: string
+  post_id: string
+  user_id: string
+  content: string
+  created_at: string
+  parent_id: string | null
+  is_deleted: boolean
+  deleted_at: string | null
+  reviewed_at: string | null
+  reviewed_by: string | null
+}
+
+interface CommentUserFromDB {
+  id: string
+  full_name: string | null
+  email: string
+  is_banned: boolean
+}
+
+interface CommentWithUser extends CommentFromDB {
+  user: CommentUserFromDB | null
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -94,16 +119,16 @@ export async function GET(
       .order('created_at', { ascending: true })
 
     // Obtener información de usuarios de los comentarios
-    const commentUserIds = comments?.map((c: any) => c.user_id).filter(Boolean) || []
+    const commentUserIds = (comments as CommentFromDB[] | null)?.map((c) => c.user_id).filter(Boolean) || []
     const { data: commentUsers } = await supabase
       .from('profiles')
       .select('id, full_name, email, is_banned')
       .in('id', commentUserIds)
 
     // Mapear usuarios a comentarios
-    const commentsWithUsers = comments?.map((comment: any) => ({
+    const commentsWithUsers: CommentWithUser[] = (comments as CommentFromDB[] | null)?.map((comment) => ({
       ...comment,
-      user: commentUsers?.find((u: any) => u.id === comment.user_id) || null
+      user: (commentUsers as CommentUserFromDB[] | null)?.find((u) => u.id === comment.user_id) || null
     })) || []
 
     // 5. Obtener historial de baneo si aplica
