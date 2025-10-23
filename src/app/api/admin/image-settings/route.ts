@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
-import type { ImageSettings, ImageSettingsUpdateRequest } from '@/types/admin'
+import type { ImageSettingsUpdateRequest } from '@/types/admin'
 
 // GET: Obtener configuración actual de imágenes
 export async function GET() {
@@ -28,13 +28,16 @@ export async function GET() {
     }
 
     // Convertir array de settings a objeto
-    const imageSettings: Partial<ImageSettings> = {}
+    const imageSettings: Record<string, string | number | string[]> = {}
     settings?.forEach((setting: { key: string; value: string }) => {
-      const key = setting.key as keyof ImageSettings
+      const key = setting.key
       try {
-        imageSettings[key] = JSON.parse(setting.value) as any
+        const parsedValue = JSON.parse(setting.value)
+        imageSettings[key] = parsedValue
       } catch {
-        imageSettings[key] = setting.value as any
+        // Si no se puede parsear como JSON, intentar como número
+        const numValue = parseFloat(setting.value)
+        imageSettings[key] = isNaN(numValue) ? setting.value : numValue
       }
     })
 
