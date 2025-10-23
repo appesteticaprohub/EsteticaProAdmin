@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { NotificationBroadcastService } from '@/lib/notification-service'
-import type { BroadcastNotificationRequest, ApiResponse, BroadcastResponse } from '@/types/admin'
+import type { BroadcastNotificationRequest, ApiResponse, BroadcastResponse, BroadcastAudience } from '@/types/admin'
 
 export async function POST(request: NextRequest) {
   try {
@@ -127,8 +127,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const audience = {
-      type: audienceType as any,
+    const audience: BroadcastAudience = {
+      type: audienceType as BroadcastAudience['type'],
       filter: audienceFilter || undefined,
       email_list: emailList
     }
