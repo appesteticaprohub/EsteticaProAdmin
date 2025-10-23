@@ -12,6 +12,12 @@ interface CleanupPreview {
   }
 }
 
+interface CleanupResult {
+  notifications_deleted: number
+  email_logs_deleted: number
+  total_deleted: number
+}
+
 export default function NotificationCleanup() {
   const [dateBefore, setDateBefore] = useState('')
   const [category, setCategory] = useState<string>('all')
@@ -20,7 +26,7 @@ export default function NotificationCleanup() {
   const [preview, setPreview] = useState<CleanupPreview | null>(null)
   const [loading, setLoading] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [cleanupResult, setCleanupResult] = useState<any>(null)
+  const [cleanupResult, setCleanupResult] = useState<CleanupResult | null>(null)
 
   const handlePreview = async () => {
     if (!dateBefore) {
