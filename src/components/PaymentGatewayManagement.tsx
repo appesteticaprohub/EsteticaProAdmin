@@ -198,13 +198,13 @@ export default function PaymentGatewayManagement() {
             <h4 className="font-medium text-gray-900 mb-2">Comportamiento actual:</h4>
             {isAutoRenewalEnabled ? (
               <ul className="list-disc list-inside space-y-1">
-                <li>Los usuarios verán "Suscripción mensual automática"</li>
+                <li>Los usuarios verán &quot;Suscripción mensual automática&quot;</li>
                 <li>Se crearán suscripciones recurrentes en PayPal</li>
                 <li>Los pagos se renovarán automáticamente cada mes</li>
               </ul>
             ) : (
               <ul className="list-disc list-inside space-y-1">
-                <li>Los usuarios verán "Pago único - Acceso por 1 mes"</li>
+                <li>Los usuarios verán &quot;Pago único - Acceso por 1 mes&quot;</li>
                 <li>Se crearán pagos únicos en PayPal</li>
                 <li>Los usuarios deberán pagar manualmente cada mes</li>
               </ul>
