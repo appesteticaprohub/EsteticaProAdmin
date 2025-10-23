@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
-import type { ApiResponse, LogsResponse, LogsFilters, DetailedStats } from '@/types/admin'
+import type { ApiResponse, LogsResponse, LogsFilters, EmailLog, Notification } from '@/types/admin'
+
+interface UserProfile {
+  id: string
+  full_name: string | null
+  subscription_status?: string
+  email?: string
+}
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     
     // Parsear filtros de la query string
+    const typeParam = searchParams.get('type') || 'all'
+    const statusParam = searchParams.get('status')
+    
     const filters: LogsFilters = {
-      type: searchParams.get('type') as any || 'all',
-      status: searchParams.get('status') as any || undefined,
+      type: typeParam as 'email' | 'notification' | 'all',
+      status: statusParam ? statusParam as 'sent' | 'failed' | 'delivered' : undefined,
       user_email: searchParams.get('user_email') || undefined,
       template_key: searchParams.get('template_key') || undefined,
       date_from: searchParams.get('date_from') || undefined,
@@ -26,7 +36,7 @@ export async function GET(request: NextRequest) {
     const offset = (filters.page! - 1) * filters.limit!
 
     // Obtener email logs
-    let emailLogs: any[] = []
+    let emailLogs: EmailLog[] = []
     let emailCount = 0
     
     if (filters.type === 'email' || filters.type === 'all') {
@@ -61,15 +71,15 @@ export async function GET(request: NextRequest) {
       }
 
       // Obtener datos de usuarios para email logs
-      const userIds = [...new Set(emailData?.map(log => log.user_id) || [])]
+      const userIds = [...new Set(emailData?.map((log: EmailLog) => log.user_id) || [])]
       const { data: users } = await supabase
         .from('profiles')
         .select('id, full_name, subscription_status')
         .in('id', userIds)
 
-      const userMap = new Map(users?.map(user => [user.id, user]) || [])
+      const userMap = new Map(users?.map((user: UserProfile) => [user.id, user]) || [])
 
-      emailLogs = emailData?.map(log => ({
+      emailLogs = emailData?.map((log: EmailLog) => ({
         ...log,
         user: userMap.get(log.user_id) || null
       })) || []
@@ -78,7 +88,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Obtener notificaciones
-    let notifications: any[] = []
+    let notifications: Notification[] = []
     let notificationCount = 0
 
     if (filters.type === 'notification' || filters.type === 'all') {
@@ -103,15 +113,15 @@ export async function GET(request: NextRequest) {
       }
 
       // Obtener datos de usuarios para notificaciones
-      const userIds = [...new Set(notificationData?.map(notif => notif.user_id) || [])]
+      const userIds = [...new Set(notificationData?.map((notif: Notification) => notif.user_id) || [])]
       const { data: users } = await supabase
         .from('profiles')
         .select('id, full_name, email')
         .in('id', userIds)
 
-      const userMap = new Map(users?.map(user => [user.id, user]) || [])
+      const userMap = new Map(users?.map((user: UserProfile) => [user.id, user]) || [])
 
-      notifications = notificationData?.map(notif => ({
+      notifications = notificationData?.map((notif: Notification) => ({
         ...notif,
         user: userMap.get(notif.user_id) || null
       })) || []
@@ -136,8 +146,8 @@ export async function GET(request: NextRequest) {
       .select('id')
 
     const totalEmails = emailStats?.length || 0
-    const successfulEmails = emailStats?.filter(log => log.status === 'sent').length || 0
-    const failedEmails = emailStats?.filter(log => log.status === 'failed').length || 0
+    const successfulEmails = emailStats?.filter((log: { status: string }) => log.status === 'sent').length || 0
+    const failedEmails = emailStats?.filter((log: { status: string }) => log.status === 'failed').length || 0
 
     // Calcular paginación
     const totalRecords = filters.type === 'all' ? emailCount + notificationCount : 
@@ -179,7 +189,6 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
     const body = await request.json()
     
     const { log_ids, type } = body
