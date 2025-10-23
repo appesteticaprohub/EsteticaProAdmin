@@ -2,6 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 import { createServerSupabaseClient } from '@/lib/server-supabase'
 
+interface BannedUserProfile {
+  id: string
+  email: string
+  full_name: string | null
+  is_banned: boolean
+  banned_at: string | null
+  banned_by: string | null
+  banned_reason: string | null
+  created_at: string
+  user_type: string
+  subscription_status: string
+  country: string | null
+  specialty: string | null
+  role: string
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Verificar que el usuario autenticado es admin
@@ -144,7 +160,7 @@ export async function GET(request: NextRequest) {
 
     // Para cada usuario banneado, obtener info adicional
     const usersWithDetails = await Promise.all(
-      users.map(async (user: any) => {
+      users.map(async (user: BannedUserProfile) => {
         try {
           // Obtener info del admin que banneó
           let bannedByAdmin = null
