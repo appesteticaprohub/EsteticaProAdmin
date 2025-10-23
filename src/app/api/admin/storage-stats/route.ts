@@ -2,6 +2,28 @@ import { NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 import type { StorageStats } from '@/types/admin'
 
+// Interfaces para los tipos de Supabase Storage
+interface StorageFile {
+  id: string | null
+  name: string
+  created_at: string
+  metadata?: {
+    size?: number
+  }
+  fullPath?: string
+}
+
+interface PostWithImages {
+  images: string[]
+  author_id: string
+  created_at: string
+}
+
+interface Profile {
+  id: string
+  full_name: string | null
+}
+
 export async function GET() {
   try {
     const supabase = createServerSupabaseAdminClient()
@@ -40,10 +62,10 @@ export async function GET() {
     }
 
     // 2. OBTENER ARCHIVOS EN SUBCARPETAS (user-xxx/)
-    let allImageFiles: any[] = []
+    const allImageFiles: StorageFile[] = []
     
     // Primero obtenemos las carpetas de usuarios
-    const userFolders = allFiles.filter((item: any) => item.id === null) // Las carpetas tienen id null
+    const userFolders = allFiles.filter((item: StorageFile) => item.id === null) // Las carpetas tienen id null
     
     for (const folder of userFolders) {
       const { data: folderFiles, error: folderError } = await supabase
@@ -57,8 +79,8 @@ export async function GET() {
       if (!folderError && folderFiles) {
         // Agregar el path completo a cada archivo
         const filesWithPath = folderFiles
-          .filter((f: any) => f.id !== null) // Solo archivos, no carpetas
-          .map((f: any) => ({
+          .filter((f: StorageFile) => f.id !== null) // Solo archivos, no carpetas
+          .map((f: StorageFile) => ({
             ...f,
             fullPath: `${folder.name}/${f.name}`
           }))
@@ -82,7 +104,7 @@ export async function GET() {
     }
 
     // 3. CALCULAR TAMAÑO REAL DEL STORAGE (sumando metadata.size de cada archivo)
-    const totalBytes = allImageFiles.reduce((sum: number, file: any) => {
+    const totalBytes = allImageFiles.reduce((sum: number, file: StorageFile) => {
       return sum + (file.metadata?.size || 0)
     }, 0)
     const storageUsedMb = totalBytes / (1024 * 1024) // Convertir bytes a MB
@@ -102,9 +124,9 @@ export async function GET() {
     }
 
     // 5. VALIDAR QUE LAS URLS EN LA BD EXISTAN EN STORAGE FÍSICO
-    const storageFileNames = new Set(allImageFiles.map((f: any) => f.name))
+    const storageFileNames = new Set(allImageFiles.map((f: StorageFile) => f.name))
     
-    const validPosts = posts?.map((post: any) => {
+    const validPosts = posts?.map((post: PostWithImages) => {
       if (!post.images || post.images.length === 0) return post
       
       // Filtrar solo las imágenes que existen físicamente en storage
@@ -117,7 +139,7 @@ export async function GET() {
         ...post,
         images: validImages
       }
-    }).filter((post: any) => post.images && post.images.length > 0) || []
+    }).filter((post: PostWithImages) => post.images && post.images.length > 0) || []
 
     const totalImages = allImageFiles.length // Usar archivos físicos reales
 
@@ -127,25 +149,25 @@ export async function GET() {
     const startOfWeek = new Date(now)
     startOfWeek.setDate(now.getDate() - 7)
 
-    const imagesThisMonth = allImageFiles.filter((file: any) => {
+    const imagesThisMonth = allImageFiles.filter((file: StorageFile) => {
       const createdAt = new Date(file.created_at)
       return createdAt >= startOfMonth
     }).length
 
-    const imagesThisWeek = allImageFiles.filter((file: any) => {
+    const imagesThisWeek = allImageFiles.filter((file: StorageFile) => {
       const createdAt = new Date(file.created_at)
       return createdAt >= startOfWeek
     }).length
 
     // 7. CALCULAR PROMEDIO DE IMÁGENES POR POST (solo posts con imágenes válidas)
-    const postsWithImages = validPosts.filter((p: any) => p.images && p.images.length > 0)
+    const postsWithImages = validPosts.filter((p: PostWithImages) => p.images && p.images.length > 0)
     const averageImagesPerPost = postsWithImages.length > 0
       ? totalImages / postsWithImages.length
       : 0
 
     // 8. TOP UPLOADERS (usuarios con más imágenes REALES)
     const uploaderMap = new Map<string, number>()
-    validPosts.forEach((post: any) => {
+    validPosts.forEach((post: PostWithImages) => {
       if (post.images && post.images.length > 0) {
         const count = uploaderMap.get(post.author_id) || 0
         uploaderMap.set(post.author_id, count + post.images.length)
@@ -166,7 +188,7 @@ export async function GET() {
         .in('id', topUploaderIds)
 
       topUploaders = topUploaderIds.map(id => {
-        const profile = profiles?.find((p: any) => p.id === id)
+        const profile = profiles?.find((p: Profile) => p.id === id)
         return {
           user_id: id,
           user_name: profile?.full_name || 'Usuario sin nombre',
@@ -186,7 +208,7 @@ export async function GET() {
         month: 'short' 
       })
 
-      const count = allImageFiles.filter((file: any) => {
+      const count = allImageFiles.filter((file: StorageFile) => {
         const createdAt = new Date(file.created_at)
         return createdAt >= monthDate && createdAt <= monthEnd
       }).length
