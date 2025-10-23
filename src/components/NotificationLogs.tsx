@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 interface EmailLog {
   id: string
@@ -13,6 +13,23 @@ interface EmailLog {
   sent_at: string
 }
 
+interface EmailLog {
+  id: string
+  user_id: string
+  template_key: string
+  email: string
+  status: string
+  resend_id: string | null
+  error_message: string | null
+  sent_at: string
+}
+
+interface Template {
+  template_key: string
+  subject: string
+  is_active: boolean
+}
+
 interface LogsFilters {
   status?: string
   template_key?: string
@@ -21,12 +38,6 @@ interface LogsFilters {
   end_date?: string
   limit?: number
   offset?: number
-}
-
-interface LogsResponse {
-  logs: EmailLog[]
-  total: number
-  has_more: boolean
 }
 
 export default function NotificationLogs() {
@@ -44,22 +55,7 @@ export default function NotificationLogs() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  useEffect(() => {
-    fetchLogs()
-    fetchAvailableTemplates()
-  }, [])
-
-  useEffect(() => {
-    const newFilters = { ...filters, offset: 0 }
-    setFilters(newFilters)
-    fetchLogsWithFilters(newFilters)
-  }, [filters.status, filters.template_key, filters.email, filters.start_date, filters.end_date])
-
-  const fetchLogs = () => {
-    fetchLogsWithFilters(filters)
-  }
-
-  const fetchLogsWithFilters = async (currentFilters: LogsFilters) => {
+  const fetchLogsWithFilters = useCallback(async (currentFilters: LogsFilters) => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
@@ -76,7 +72,7 @@ export default function NotificationLogs() {
         const data = result.data || result
         
         const combinedLogs = [
-          ...(data.email_logs || []).map((log: any) => ({
+          ...(data.email_logs || []).map((log: EmailLog) => ({
             id: log.id,
             user_id: log.user_id,
             template_key: log.template_key,
@@ -102,14 +98,20 @@ export default function NotificationLogs() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    fetchLogsWithFilters(filters)
+    fetchAvailableTemplates()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const fetchAvailableTemplates = async () => {
     try {
       const response = await fetch('/api/admin/notifications/templates')
       if (response.ok) {
         const data = await response.json()
-        const templateKeys = data.templates?.map((t: any) => t.template_key) || []
+        const templateKeys = data.templates?.map((t: Template) => t.template_key) || []
         setAvailableTemplates(templateKeys)
       }
     } catch (error) {
@@ -247,7 +249,7 @@ export default function NotificationLogs() {
         alert(`${result.data.deleted_count} logs eliminados exitosamente`)
         setSelectedLogs([])
         setShowDeleteModal(false)
-        fetchLogs()
+        fetchLogsWithFilters(filters)
       } else {
         const error = await response.json()
         alert(`Error al eliminar: ${error.error}`)
@@ -307,7 +309,11 @@ export default function NotificationLogs() {
               </label>
               <select
                 value={filters.status || ''}
-                onChange={(e) => setFilters({ ...filters, status: e.target.value || undefined })}
+                onChange={(e) => {
+                  const newFilters = { ...filters, status: e.target.value || undefined, offset: 0 }
+                  setFilters(newFilters)
+                  fetchLogsWithFilters(newFilters)
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Todos</option>
@@ -323,7 +329,11 @@ export default function NotificationLogs() {
               </label>
               <select
                 value={filters.template_key || ''}
-                onChange={(e) => setFilters({ ...filters, template_key: e.target.value || undefined })}
+                onChange={(e) => {
+                  const newFilters = { ...filters, template_key: e.target.value || undefined, offset: 0 }
+                  setFilters(newFilters)
+                  fetchLogsWithFilters(newFilters)
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Todos</option>
@@ -342,7 +352,11 @@ export default function NotificationLogs() {
               <input
                 type="email"
                 value={filters.email || ''}
-                onChange={(e) => setFilters({ ...filters, email: e.target.value || undefined })}
+                onChange={(e) => {
+                  const newFilters = { ...filters, email: e.target.value || undefined, offset: 0 }
+                  setFilters(newFilters)
+                  fetchLogsWithFilters(newFilters)
+                }}
                 placeholder="usuario@ejemplo.com"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
@@ -355,7 +369,11 @@ export default function NotificationLogs() {
               <input
                 type="date"
                 value={filters.start_date || ''}
-                onChange={(e) => setFilters({ ...filters, start_date: e.target.value || undefined })}
+                onChange={(e) => {
+                  const newFilters = { ...filters, start_date: e.target.value || undefined, offset: 0 }
+                  setFilters(newFilters)
+                  fetchLogsWithFilters(newFilters)
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
