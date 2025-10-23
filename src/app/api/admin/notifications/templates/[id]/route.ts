@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 
-// GET - Obtener un template especÃ­fico por ID
+// Tipo para los datos de actualización de template
+type TemplateUpdateData = {
+  subject?: string
+  html_content?: string
+  is_active?: boolean
+}
+
+// GET - Obtener un template específico por ID
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -9,7 +16,6 @@ export async function GET(
   const { id } = await params
   try {
     const supabase = await createServerSupabaseAdminClient()
-
     const { data: template, error } = await supabase
       .from('email_templates')
       .select('*')
@@ -34,8 +40,8 @@ export async function GET(
       data: template,
       error: null
     })
-
-  } catch (error) {
+  } catch (err) {
+    console.error('Error al obtener template:', err)
     return NextResponse.json(
       { data: null, error: 'Error interno del servidor' },
       { status: 500 }
@@ -69,7 +75,7 @@ export async function PUT(
       )
     }
 
-    const updateData: any = {}
+    const updateData: TemplateUpdateData = {}
     if (subject !== undefined) updateData.subject = subject
     if (html_content !== undefined) updateData.html_content = html_content
     if (is_active !== undefined) updateData.is_active = is_active
@@ -92,8 +98,8 @@ export async function PUT(
       data: template,
       error: null
     })
-
-  } catch (error) {
+  } catch (err) {
+    console.error('Error al actualizar template:', err)
     return NextResponse.json(
       { data: null, error: 'Error interno del servidor' },
       { status: 500 }
@@ -140,8 +146,8 @@ export async function DELETE(
       data: { message: 'Template eliminado correctamente' },
       error: null
     })
-
-  } catch (error) {
+  } catch (err) {
+    console.error('Error al eliminar template:', err)
     return NextResponse.json(
       { data: null, error: 'Error interno del servidor' },
       { status: 500 }
