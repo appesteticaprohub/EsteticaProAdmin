@@ -2,6 +2,45 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 import { createServerSupabaseClient } from '@/lib/server-supabase'
 
+// Interfaces para tipar los datos de Supabase
+interface AuthorFromDB {
+  id: string
+}
+
+interface PostFromDB {
+  id: string
+  title: string
+  content: string
+  author_id: string
+  created_at: string
+  views_count: number
+  likes_count: number
+  comments_count: number
+  category: string | null
+  images: string[]
+  is_reviewed: boolean
+  reviewed_at: string | null
+  reviewed_by: string | null
+  is_deleted: boolean
+  deleted_at: string | null
+}
+
+interface AuthorFullFromDB {
+  id: string
+  full_name: string | null
+  email: string
+  country: string | null
+  specialty: string | null
+  user_type: string
+  subscription_status: string
+  is_banned: boolean
+  created_at: string
+}
+
+interface PostWithAuthor extends PostFromDB {
+  author: AuthorFullFromDB | null
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Verificar que el usuario autenticado es admin
@@ -79,7 +118,7 @@ export async function GET(request: NextRequest) {
       }
 
       const { data: filteredAuthors } = await authorQuery
-      authorIds = filteredAuthors?.map((author: any) => author.id) || []
+      authorIds = (filteredAuthors as AuthorFromDB[] | null)?.map((author) => author.id) || []
 
       // Si no hay autores que cumplan los filtros, retornar vacío
       if (authorIds.length === 0) {
@@ -182,9 +221,9 @@ export async function GET(request: NextRequest) {
     }
 
     // PASO 3: Obtener información de autores para los posts obtenidos
-    const postAuthorIds = posts?.map((post: any) => post.author_id).filter(Boolean) || []
+    const postAuthorIds = (posts as PostFromDB[] | null)?.map((post) => post.author_id).filter(Boolean) || []
     
-    let authors: any[] = []
+    let authors: AuthorFullFromDB[] = []
     if (postAuthorIds.length > 0) {
       const { data: authorsData } = await supabase
         .from('profiles')
@@ -195,9 +234,9 @@ export async function GET(request: NextRequest) {
     }
 
     // PASO 4: Mapear autores a posts
-    const postsWithAuthors = posts?.map((post: any) => ({
+    const postsWithAuthors: PostWithAuthor[] = (posts as PostFromDB[] | null)?.map((post) => ({
       ...post,
-      author: authors.find((author: any) => author.id === post.author_id) || null
+      author: authors.find((author) => author.id === post.author_id) || null
     })) || []
 
     // Calcular paginación
