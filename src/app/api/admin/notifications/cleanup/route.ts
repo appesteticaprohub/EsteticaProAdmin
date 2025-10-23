@@ -3,8 +3,8 @@ import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 
 interface CleanupFilters {
   date_before?: string;
-  category?: 'critical' | 'important' | 'normal' | 'promotional';
-  type?: 'email' | 'in_app';
+  category?: 'critical' | 'important' | 'normal' | 'promotional' | 'all';
+  type?: 'email' | 'in_app' | 'all';
   is_read?: boolean;
 }
 
@@ -19,14 +19,28 @@ interface CleanupPreview {
 }
 
 // GET - Preview de limpieza (cuántos registros se eliminarán)
+interface NotificationRecord {
+  id: string;
+  category: 'critical' | 'important' | 'normal' | 'promotional';
+  type: 'email' | 'in_app';
+  is_read: boolean;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     
+    const categoryParam = searchParams.get('category')
+    const typeParam = searchParams.get('type')
+    
     const filters: CleanupFilters = {
       date_before: searchParams.get('date_before') || undefined,
-      category: searchParams.get('category') as any || undefined,
-      type: searchParams.get('type') as any || undefined,
+      category: categoryParam && categoryParam !== 'all' 
+        ? categoryParam as 'critical' | 'important' | 'normal' | 'promotional'
+        : undefined,
+      type: typeParam && typeParam !== 'all'
+        ? typeParam as 'email' | 'in_app'
+        : undefined,
       is_read: searchParams.get('is_read') ? searchParams.get('is_read') === 'true' : undefined,
     }
 
@@ -63,7 +77,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Query para email logs
-    let emailLogsQuery = supabase
+    const emailLogsQuery = supabase
       .from('email_logs')
       .select('id')
       .lt('sent_at', filters.date_before)
@@ -80,7 +94,7 @@ export async function GET(request: NextRequest) {
     let readCount = 0
     let unreadCount = 0
 
-    notifications?.forEach(notif => {
+    notifications?.forEach((notif: NotificationRecord) => {
       byCategory[notif.category] = (byCategory[notif.category] || 0) + 1
       byType[notif.type] = (byType[notif.type] || 0) + 1
       if (notif.is_read) readCount++
