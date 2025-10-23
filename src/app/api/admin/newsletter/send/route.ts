@@ -1,11 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 
+// Interfaces para tipar los datos
+interface PostFromDB {
+  id: string
+  title: string
+  content: string
+  created_at: string
+  category: string | null
+  author_id: string
+}
+
+interface ProfileFromDB {
+  id: string
+  full_name: string | null
+  email: string
+}
+
+interface PostWithProfile extends PostFromDB {
+  profiles?: ProfileFromDB
+}
+
+interface RecipientData {
+  user_id: string
+  email: string
+  full_name: string | null
+}
+
+interface PreferenceFromDB {
+  user_id: string
+  profiles: ProfileFromDB | ProfileFromDB[]
+}
+
+interface EmailLogEntry {
+  user_id: string
+  template_key: string
+  email: string
+  status: 'sent' | 'failed'
+  resend_id: string | null
+  error_message: string | null
+}
+
 // POST - Enviar newsletter masiva con posts seleccionados
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { post_ids, custom_subject, confirm_send } = body
+    const { post_ids, custom_subject } = body
 
     if (!post_ids || !Array.isArray(post_ids) || post_ids.length === 0) {
       return NextResponse.json(
@@ -36,14 +76,14 @@ export async function POST(request: NextRequest) {
       .select('user_id, profiles!inner(id, email, full_name)')
       .eq('email_content', true)
 
-    const recipients = preferences?.map((pref: any) => {
+    const recipients: RecipientData[] = (preferences as PreferenceFromDB[] | null)?.map((pref) => {
       const profile = Array.isArray(pref.profiles) ? pref.profiles[0] : pref.profiles
       return {
         user_id: pref.user_id,
         email: profile?.email,
         full_name: profile?.full_name
       }
-    }).filter((r: any) => r.email) || []
+    }).filter((r): r is RecipientData => Boolean(r.email)) || []
 
     console.log('📧 Recipients encontrados:', recipients.length)
     console.log('📧 Recipients:', recipients)
@@ -77,15 +117,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Obtener información de autores
-    const authorIds = posts.map((p: any) => p.author_id)
+    const authorIds = (posts as PostFromDB[]).map((p) => p.author_id)
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, full_name, email')
       .in('id', authorIds)
 
-    const profileMap = new Map(profiles?.map((p: any) => [p.id, p]) || [])
+    const profileMap = new Map((profiles as ProfileFromDB[] | null)?.map((p) => [p.id, p]) || [])
     
-    const postsWithProfiles = posts.map((post: any) => ({
+    const postsWithProfiles: PostWithProfile[] = (posts as PostFromDB[]).map((post) => ({
       ...post,
       profiles: profileMap.get(post.author_id)
     }))
@@ -130,15 +170,16 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
+    console.error('Error sending newsletter:', error)
     return NextResponse.json(
-      { data: null, error: 'Error interno del servidor' },
+      { data: null, error: error instanceof Error ? error.message : 'Error interno del servidor' },
       { status: 500 }
     )
   }
 }
 
 // Función para envío masivo de newsletter
-async function sendNewsletterToRecipients(recipients: any[], posts: any[], subject: string) {
+async function sendNewsletterToRecipients(recipients: RecipientData[], posts: PostWithProfile[], subject: string) {
     console.log('📮 Iniciando envío de newsletter')
   console.log('📮 Recipients:', recipients.length)
   console.log('📮 Posts:', posts.length)
@@ -156,7 +197,7 @@ async function sendNewsletterToRecipients(recipients: any[], posts: any[], subje
 
   let success_count = 0
   let failed_count = 0
-  const emailLogs: any[] = []
+  const emailLogs: EmailLogEntry[] = []
 
   // Generar HTML de posts
   const postsHtml = generatePostsHtml(posts)
@@ -246,10 +287,10 @@ async function sendNewsletterToRecipients(recipients: any[], posts: any[], subje
   
 
 // Función para generar HTML de posts para newsletter
-function generatePostsHtml(posts: any[]): string {
+function generatePostsHtml(posts: PostWithProfile[]): string {
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://esteticaprohub.com').replace(/\/$/, '')
 
-  return posts.map((post: any) => {
+  return posts.map((post) => {
     const profile = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles
     const excerpt = post.content?.replace(/<[^>]*>/g, '').substring(0, 150) + '...'
     const postUrl = `${baseUrl}/post/${post.id}`
