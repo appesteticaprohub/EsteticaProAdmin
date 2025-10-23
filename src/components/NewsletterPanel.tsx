@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 interface Post {
   id: string
@@ -34,17 +34,6 @@ export default function NewsletterPanel() {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
-
-  useEffect(() => {
-    fetchSettings()
-    fetchPosts()
-  }, [])
-
-  useEffect(() => {
-    if (selectedPosts.length > 0) {
-      generatePreview()
-    }
-  }, [selectedPosts])
 
   const fetchSettings = async () => {
     try {
@@ -84,7 +73,7 @@ export default function NewsletterPanel() {
     }
   }
 
-  const generatePreview = async () => {
+  const generatePreview = useCallback(async () => {
     if (selectedPosts.length === 0) return
 
     try {
@@ -108,7 +97,18 @@ export default function NewsletterPanel() {
     } catch (error) {
       console.error('Error generating preview:', error)
     }
-  }
+  }, [selectedPosts])
+
+  useEffect(() => {
+    fetchSettings()
+    fetchPosts()
+  }, [])
+
+  useEffect(() => {
+    if (selectedPosts.length > 0) {
+      generatePreview()
+    }
+  }, [selectedPosts, generatePreview])
 
   const toggleNewsletterStatus = async () => {
     if (!settings) return
@@ -206,7 +206,7 @@ export default function NewsletterPanel() {
     
     // Obtener componentes UTC y restar 5 horas manualmente para Colombia
     let utcHours = date.getUTCHours()
-    let utcMinutes = date.getUTCMinutes()
+    const utcMinutes = date.getUTCMinutes()
     let utcDay = date.getUTCDate()
     let utcMonth = date.getUTCMonth() + 1
     let utcYear = date.getUTCFullYear()
