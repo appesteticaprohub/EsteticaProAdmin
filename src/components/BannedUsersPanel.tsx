@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 interface PaginationInfo {
   current_page: number
@@ -60,7 +60,7 @@ export default function BannedUsersPanel() {
   })
 
 
-  const fetchBannedUsers = async (page: number = 1) => {
+  const fetchBannedUsers = useCallback(async (page: number = 1) => {
     try {
       setLoading(true)
       
@@ -93,15 +93,16 @@ export default function BannedUsersPanel() {
         }
       }
     } catch (err) {
+      console.error('Error al cargar usuarios banneados:', err)
       setError('Error al cargar usuarios banneados')
     } finally {
       setLoading(false)
     }
-  }
+  }, [activeFilters])
 
   useEffect(() => {
     fetchBannedUsers(currentPage)
-  }, [currentPage, activeFilters])
+  }, [currentPage, activeFilters, fetchBannedUsers])
 
   const handleUnban = async (userId: string) => {
     if (!confirm('¿Estás seguro de que deseas desbanear a este usuario?')) {
@@ -124,6 +125,7 @@ export default function BannedUsersPanel() {
         await fetchBannedUsers(currentPage)
       }
     } catch (err) {
+      console.error('Error al desbanear usuario:', err)
       alert('Error al desbanear usuario')
     } finally {
       setActionLoading(null)
@@ -273,7 +275,7 @@ export default function BannedUsersPanel() {
             <div className="flex flex-wrap gap-2">
               {activeFilters.search && (
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  Búsqueda: "{activeFilters.search}"
+                  Búsqueda: &quot;{activeFilters.search}&quot;
                 </span>
               )}
               {activeFilters.dateFrom && (
