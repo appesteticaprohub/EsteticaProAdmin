@@ -2,6 +2,28 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 import { createServerSupabaseClient } from '@/lib/server-supabase'
 
+interface ModerationLog {
+  id: string
+  admin_id: string | null
+  action_type: string
+  target_type: string
+  target_id: string
+  reason: string | null
+  created_at: string
+  metadata?: Record<string, unknown>
+}
+
+interface AdminProfile {
+  id: string
+  full_name: string | null
+  email: string
+}
+
+interface PostStats {
+  views_count: number
+  likes_count: number
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -83,16 +105,16 @@ export async function GET(
       .order('created_at', { ascending: false })
 
     // 5. Obtener información de admins que hicieron acciones
-    const adminIds = moderationLogs?.map((log: any) => log.admin_id).filter(Boolean) || []
+    const adminIds = moderationLogs?.map((log: ModerationLog) => log.admin_id).filter(Boolean) || []
     const { data: admins } = await supabase
       .from('profiles')
       .select('id, full_name, email')
       .in('id', adminIds)
 
     // Mapear admins a logs
-    const logsWithAdmins = moderationLogs?.map((log: any) => ({
+    const logsWithAdmins = moderationLogs?.map((log: ModerationLog) => ({
       ...log,
-      admin: admins?.find((a: any) => a.id === log.admin_id) || null
+      admin: admins?.find((a: AdminProfile) => a.id === log.admin_id) || null
     })) || []
 
     // 6. Calcular estadísticas globales (no paginadas)
@@ -123,8 +145,8 @@ export async function GET(
       .select('views_count, likes_count')
       .eq('author_id', userId)
 
-    const totalViews = allPostsForStats?.reduce((sum: number, p: any) => sum + (p.views_count || 0), 0) || 0
-    const totalLikes = allPostsForStats?.reduce((sum: number, p: any) => sum + (p.likes_count || 0), 0) || 0
+    const totalViews = allPostsForStats?.reduce((sum: number, p: PostStats) => sum + (p.views_count || 0), 0) || 0
+    const totalLikes = allPostsForStats?.reduce((sum: number, p: PostStats) => sum + (p.likes_count || 0), 0) || 0
 
     const stats = {
       total_posts: totalPosts || 0,
