@@ -187,7 +187,6 @@ export default function CommentsTreeView({
   const renderComment = (comment: CommentNode, level: number = 0) => {
     const isCollapsed = collapsedThreads.has(comment.id)
     const hasReplies = comment.replies.length > 0
-    const indentClass = level > 0 ? `ml-${Math.min(level * 8, 16)}` : ''
     
     return (
       <div key={comment.id} className={level > 0 ? 'ml-8 border-l-2 border-gray-200 pl-4' : ''}>
