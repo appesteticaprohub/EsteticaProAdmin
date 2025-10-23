@@ -61,6 +61,7 @@ export default function BackupPanel() {
     }
 
     fetchTables()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Solo se ejecuta al montar el componente
 
   // Efecto para seleccionar todas las tablas y opciones cuando cambia a modo completo
