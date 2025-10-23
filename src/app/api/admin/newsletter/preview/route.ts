@@ -1,6 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 
+// Interfaces para tipar los datos
+interface PostFromDB {
+  id: string
+  title: string
+  content: string
+  created_at: string
+  category: string | null
+  author_id: string
+}
+
+interface ProfileFromDB {
+  id: string
+  full_name: string | null
+  email: string
+}
+
+interface PostWithProfile extends PostFromDB {
+  profiles?: ProfileFromDB
+}
+
 // POST - Generar preview de newsletter con posts seleccionados
 export async function POST(request: NextRequest) {
   try {
@@ -38,16 +58,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Obtener información de autores
-    const authorIds = posts.map(p => p.author_id)
+    const authorIds = (posts as PostFromDB[]).map((p) => p.author_id)
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, full_name, email')
       .in('id', authorIds)
 
-    const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
+    const profileMap = new Map((profiles as ProfileFromDB[] | null)?.map((p) => [p.id, p]) || [])
     
     // Agregar profile a cada post
-    const postsWithProfiles = posts.map(post => ({
+    const postsWithProfiles: PostWithProfile[] = (posts as PostFromDB[]).map((post) => ({
       ...post,
       profiles: profileMap.get(post.author_id)
     }))
@@ -78,15 +98,16 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
+    console.error('Error generating newsletter preview:', error)
     return NextResponse.json(
-      { data: null, error: 'Error interno del servidor' },
+      { data: null, error: error instanceof Error ? error.message : 'Error interno del servidor' },
       { status: 500 }
     )
   }
 }
 
 // Función para generar HTML de newsletter
-function generateNewsletterHtml(posts: any[], customSubject?: string): string {
+function generateNewsletterHtml(posts: PostWithProfile[], customSubject?: string): string {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://esteticaprohub.com'
   
   const postsHtml = posts.map(post => {
