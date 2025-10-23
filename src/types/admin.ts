@@ -269,7 +269,7 @@ export interface ModerationLog {
   target_type: 'user' | 'post' | 'comment'
   target_id: string
   reason: string | null
-  metadata: any
+  metadata: ModerationLogMetadata | null
   created_at: string
 }
 
@@ -609,3 +609,25 @@ export interface DeleteStaffUserResponse {
     likes: number
   }
 }
+
+// Tipos para metadata de logs de moderación
+export interface ModerationLogMetadata {
+  post_title?: string
+  comment_content?: string
+  user_email?: string
+  images_deleted?: number
+  comments_deleted?: number
+  likes_deleted?: number
+  auto_cleanup?: boolean
+  permanent_delete?: boolean
+  [key: string]: string | number | boolean | undefined
+}
+
+// Tipo para imágenes de posts
+export interface PostImage {
+  id?: string
+  post_id?: string
+  image_url: string
+  created_at?: string
+}
+

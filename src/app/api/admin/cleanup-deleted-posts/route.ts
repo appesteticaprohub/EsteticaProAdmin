@@ -3,6 +3,26 @@ import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 import { createServerSupabaseClient } from '@/lib/server-supabase'
 import { DeletedPostsListResponse, DeletedPostItem } from '@/types/admin'
 
+// Interfaces para tipar los datos de Supabase
+interface DeletedPostFromDB {
+  id: string
+  title: string
+  content: string
+  author_id: string
+  deleted_at: string
+  category: string | null
+  images: string[] | null
+  comments_count: number
+  likes_count: number
+  views_count: number
+}
+
+interface AuthorFromDB {
+  id: string
+  full_name: string | null
+  email: string
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Verificar que el usuario autenticado es admin
@@ -90,15 +110,15 @@ const { data: deletedPosts, error: postsError } = await supabase
     }
 
     // Obtener información de los autores
-    const authorIds = deletedPosts.map((p: any) => p.author_id)
+    const authorIds = (deletedPosts as DeletedPostFromDB[]).map((p) => p.author_id)
     const { data: authors } = await supabase
       .from('profiles')
       .select('id, full_name, email')
       .in('id', authorIds)
 
     // Mapear posts con información del autor
-    const postsWithAuthors: DeletedPostItem[] = deletedPosts.map((post: any) => {
-      const author = authors?.find((a: any) => a.id === post.author_id)
+    const postsWithAuthors: DeletedPostItem[] = (deletedPosts as DeletedPostFromDB[]).map((post) => {
+      const author = (authors as AuthorFromDB[] | null)?.find((a) => a.id === post.author_id)
       return {
         id: post.id,
         title: post.title,
