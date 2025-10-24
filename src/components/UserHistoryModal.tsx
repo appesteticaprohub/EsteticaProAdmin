@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { PostWithAuthor, CommentWithUser, UserHistoryResponse, UserHistoryPagination } from '@/types/admin'
+import { useState, useEffect, useCallback } from 'react'
+import { PostWithAuthor, CommentWithUser, UserHistoryPagination } from '@/types/admin'
 
 interface UserHistoryModalProps {
   isOpen: boolean
@@ -39,13 +39,7 @@ export default function UserHistoryModal({
   const postsLimit = 10
   const commentsLimit = 10
 
-  useEffect(() => {
-    if (isOpen && userId) {
-      fetchUserHistory()
-    }
-  }, [isOpen, userId, postsPage, commentsPage])
-
-  const fetchUserHistory = async () => {
+  const fetchUserHistory = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -63,12 +57,18 @@ export default function UserHistoryModal({
       } else {
         setHistory(result.data)
       }
-    } catch (err) {
+    } catch {
       setError('Error al cargar el historial del usuario')
     } finally {
       setLoading(false)
     }
-  }
+  }, [userId, postsPage, postsLimit, commentsPage, commentsLimit])
+
+  useEffect(() => {
+    if (isOpen && userId) {
+      fetchUserHistory()
+    }
+  }, [isOpen, userId, postsPage, commentsPage, fetchUserHistory])
 
   const handlePostsNextPage = () => {
     if (history?.pagination.posts.has_next) {
