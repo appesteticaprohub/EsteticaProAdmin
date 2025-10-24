@@ -6,7 +6,19 @@ import type {
   ColumnInfo,
   ForeignKeyInfo,
   IndexInfo,
-  RLSPolicy
+  RLSPolicy,
+  TableNameResult,
+  ColumnQueryResult,
+  PrimaryKeyResult,
+  ForeignKeyQueryResult,
+  IndexQueryResult,
+  PolicyQueryResult,
+  TriggerQueryResult,
+  TriggerInfo,
+  FunctionQueryResult,
+  FunctionInfo,
+  ExtensionQueryResult,
+  TableBackupData
 } from '@/types/backup'
 
 export class BackupService {
@@ -30,7 +42,7 @@ export class BackupService {
         .eq('table_schema', 'public')
       
       if (result.error) throw new Error(`Error discovering tables: ${result.error.message}`)
-      return result.data?.map((t: any) => t.table_name) || []
+      return result.data?.map((t: TableNameResult) => t.table_name) || []
     }
 
     return data || []
@@ -91,7 +103,7 @@ export class BackupService {
 
     if (error) throw new Error(`Error getting columns: ${error.message}`)
 
-    return (data || []).map((col: any) => ({
+    return (data || []).map((col: ColumnQueryResult) => ({
       name: col.name,
       type: col.type,
       nullable: col.nullable === 'YES',
@@ -115,7 +127,7 @@ export class BackupService {
     })
 
     if (error) return []
-    return (data || []).map((row: any) => row.column_name)
+    return (data || []).map((row: PrimaryKeyResult) => row.column_name)
   }
 
   /**
@@ -148,7 +160,7 @@ export class BackupService {
 
     if (error) return []
 
-    return (data || []).map((fk: any) => ({
+    return (data || []).map((fk: ForeignKeyQueryResult) => ({
       name: fk.name,
       column: fk.column,
       referencedTable: fk.referenced_table,
@@ -185,7 +197,7 @@ export class BackupService {
 
     if (error) return []
 
-    return (data || []).map((idx: any) => ({
+    return (data || []).map((idx: IndexQueryResult) => ({
       name: idx.name,
       columns: idx.columns,
       unique: idx.unique,
@@ -217,7 +229,7 @@ export class BackupService {
 
     if (error) return []
 
-    return (data || []).map((policy: any) => ({
+    return (data || []).map((policy: PolicyQueryResult) => ({
       tableName: policy.table_name,
       policyName: policy.policy_name,
       command: policy.command,
@@ -234,7 +246,7 @@ export class BackupService {
     tableName: string, 
     dateFrom?: string, 
     dateTo?: string
-  ): Promise<any[]> {
+  ): Promise<Record<string, unknown>[]> {
     let query = this.supabase.from(tableName).select('*')
 
     // Aplicar filtros de fecha si existen
@@ -267,7 +279,7 @@ export class BackupService {
   /**
    * Obtiene todos los triggers de una tabla
    */
-  async getTriggers(tableName: string): Promise<any[]> {
+  async getTriggers(tableName: string): Promise<TriggerInfo[]> {
     const query = `
       SELECT
         t.tgname as trigger_name,
@@ -288,7 +300,7 @@ export class BackupService {
 
     if (error) return []
     
-    return (data || []).map((trigger: any) => ({
+    return (data || []).map((trigger: TriggerQueryResult) => ({
       triggerName: trigger.trigger_name,
       definition: trigger.trigger_definition,
       isEnabled: trigger.is_enabled === 'O',
@@ -300,7 +312,7 @@ export class BackupService {
   /**
    * Obtiene todas las funciones/procedimientos almacenados del schema público
    */
-  async getFunctions(): Promise<any[]> {
+  async getFunctions(): Promise<FunctionInfo[]> {
     const query = `
       SELECT
         p.proname as function_name,
@@ -331,7 +343,7 @@ export class BackupService {
 
     if (error) return []
     
-    return (data || []).map((func: any) => ({
+    return (data || []).map((func: FunctionQueryResult) => ({
       functionName: func.function_name,
       definition: func.function_definition,
       arguments: func.arguments,
@@ -353,7 +365,7 @@ export class BackupService {
     })
 
     if (error) return []
-    return (data || []).map((ext: any) => ext.extname)
+    return (data || []).map((ext: ExtensionQueryResult) => ext.extname)
   }
 
   /**
@@ -391,7 +403,7 @@ export class BackupService {
     // Procesar cada tabla
     for (const tableName of tables) {
       try {
-        const tableData: any = {
+        const tableData: TableBackupData = {
           structure: null,
           data: [],
           policies: []
@@ -434,7 +446,7 @@ export class BackupService {
       backupData.functions = await this.getFunctions()
       
       // Obtener triggers de cada tabla procesada
-      const allTriggers: any[] = []
+      const allTriggers: TriggerInfo[] = []
       for (const tableName of tables) {
         try {
           const tableTriggers = await this.getTriggers(tableName)
