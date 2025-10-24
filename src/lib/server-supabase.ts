@@ -32,8 +32,6 @@ export async function createServerSupabaseClient() {
 // Función helper para crear cliente con service role (para operaciones admin)
 // Este cliente bypassa RLS completamente
 export function createServerSupabaseAdminClient() {
-  const { createClient } = require('@supabase/supabase-js')
-  
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
