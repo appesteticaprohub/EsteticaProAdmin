@@ -16,7 +16,7 @@ export class NotificationBroadcastService {
     
     let query = supabase
       .from('profiles')
-      .select('id, email, full_name, subscription_status, country, specialty, created_at, user_type, birth_date, subscription_expires_at, auto_renewal_enabled')
+      .select('id, email, full_name, subscription_status, country, specialty, created_at, user_type, birth_date, subscription_expires_at, auto_renewal_enabled, is_banned, role')
 
     // Aplicar filtros según tipo de audiencia
     switch (audience.type) {
