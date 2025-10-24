@@ -1,5 +1,5 @@
 import { createServerSupabaseAdminClient } from './server-supabase'
-import { sendEmail, EMAIL_CONFIG } from './resend'
+import { sendEmail } from './resend'
 import type { 
   BroadcastNotificationRequest, 
   BroadcastResponse, 
