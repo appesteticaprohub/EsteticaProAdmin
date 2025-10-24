@@ -41,7 +41,7 @@ const SPECIALTIES = [
   { value: 'dermatología', label: 'Dermatología' }
 ]
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { StaffUser, StaffUsersResponse, CreateStaffUserRequest } from '@/types/admin'
 
 export default function StaffUserManagement() {
@@ -83,7 +83,7 @@ export default function StaffUserManagement() {
   const [passwordLoading, setPasswordLoading] = useState(false)
 
   // Cargar usuarios staff
-  const fetchStaffUsers = async () => {
+  const fetchStaffUsers = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(`/api/admin/users/staff?page=${page}&limit=${limit}`)
@@ -101,11 +101,11 @@ export default function StaffUserManagement() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [page, limit])
 
   useEffect(() => {
     fetchStaffUsers()
-  }, [page])
+  }, [page, fetchStaffUsers])
 
   // Crear usuario staff
   const handleCreateUser = async (e: React.FormEvent) => {
