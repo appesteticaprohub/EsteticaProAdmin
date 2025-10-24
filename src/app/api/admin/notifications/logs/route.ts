@@ -79,10 +79,16 @@ export async function GET(request: NextRequest) {
 
       const userMap = new Map(users?.map((user: UserProfile) => [user.id, user]) || [])
 
-      emailLogs = emailData?.map((log: EmailLog) => ({
-        ...log,
-        user: userMap.get(log.user_id) || null
-      })) || []
+      emailLogs = emailData?.map((log: EmailLog) => {
+        const userProfile = userMap.get(log.user_id)
+        return {
+          ...log,
+          user: userProfile ? {
+            full_name: userProfile.full_name,
+            subscription_status: userProfile.subscription_status || 'unknown'
+          } : undefined
+        }
+      }) || []
 
       emailCount = count || 0
     }
@@ -121,10 +127,16 @@ export async function GET(request: NextRequest) {
 
       const userMap = new Map(users?.map((user: UserProfile) => [user.id, user]) || [])
 
-      notifications = notificationData?.map((notif: Notification) => ({
-        ...notif,
-        user: userMap.get(notif.user_id) || null
-      })) || []
+      notifications = notificationData?.map((notif: Notification) => {
+        const userProfile = userMap.get(notif.user_id)
+        return {
+          ...notif,
+          user: userProfile ? {
+            full_name: userProfile.full_name,
+            email: userProfile.email || ''
+          } : undefined
+        }
+      }) || []
 
       // Filtrar por email si se especifica
       if (filters.user_email) {
