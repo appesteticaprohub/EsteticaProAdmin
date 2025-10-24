@@ -302,7 +302,6 @@ export default function DashboardStats() {
           change={usersData.change}
           changeType={usersData.changeType}
           icon="👥"
-          type="users"
           onPeriodChange={handleUsersPeriodChange}
           isLoading={usersData.isLoading}
         />
@@ -314,7 +313,6 @@ export default function DashboardStats() {
           change={postsData.change}
           changeType={postsData.changeType}
           icon="📄"
-          type="posts"
           onPeriodChange={handlePostsPeriodChange}
           isLoading={postsData.isLoading}
         />
@@ -326,7 +324,6 @@ export default function DashboardStats() {
           change={subscriptionsData.change}
           changeType={subscriptionsData.changeType}
           icon="⭐"
-          type="subscriptions"
           onPeriodChange={handleSubscriptionsPeriodChange}
           isLoading={subscriptionsData.isLoading}
         />
