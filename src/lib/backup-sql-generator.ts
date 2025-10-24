@@ -41,7 +41,7 @@ export class BackupSQLGenerator {
     if (backupData.metadata.config.options.includeIndexes) {
       for (const tableName of tableNames) {
         const tableData = backupData.tables[tableName]
-        if (tableData.structure?.indexes.length > 0) {
+        if (tableData.structure?.indexes && tableData.structure.indexes.length > 0) {
           sections.push(this.generateIndexes(tableData.structure))
         }
       }
@@ -51,7 +51,7 @@ export class BackupSQLGenerator {
     if (backupData.metadata.config.options.includeStructure) {
       for (const tableName of tableNames) {
         const tableData = backupData.tables[tableName]
-        if (tableData.structure?.foreignKeys.length > 0) {
+        if (tableData.structure?.foreignKeys && tableData.structure.foreignKeys.length > 0) {
           sections.push(this.generateForeignKeys(tableData.structure))
         }
       }
@@ -189,7 +189,7 @@ CREATE TABLE public."${tableName}" (
   /**
    * Genera los INSERT statements para los datos
    */
-  private static generateTableData(tableName: string, data: any[]): string {
+  private static generateTableData(tableName: string, data: Record<string, unknown>[]): string {
     if (data.length === 0) return ''
 
     const columns = Object.keys(data[0])
@@ -222,7 +222,7 @@ ${insertStatements.join('\n\n')}`
   /**
    * Formatea un valor para SQL
    */
-  private static formatValue(value: any): string {
+  private static formatValue(value: unknown): string {
     if (value === null || value === undefined) {
       return 'NULL'
     }
