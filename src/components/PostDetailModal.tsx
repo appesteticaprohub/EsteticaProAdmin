@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import Image from 'next/image'
+
+import { useState, useEffect, useCallback } from 'react'
 import { PostDetailResponse } from '@/types/admin'
 import ImageLightbox from './ImageLightbox'
 import BanUserModal from './BanUserModal'
@@ -37,13 +39,8 @@ export default function PostDetailModal({
   const [isEditingCategory, setIsEditingCategory] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('')
 
-  useEffect(() => {
-    if (isOpen && postId) {
-      fetchPostDetail()
-    }
-  }, [isOpen, postId])
 
-  const fetchPostDetail = async () => {
+  const fetchPostDetail = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -61,7 +58,13 @@ export default function PostDetailModal({
     } finally {
       setLoading(false)
     }
-  }
+  }, [postId])
+
+  useEffect(() => {
+    if (isOpen && postId) {
+      fetchPostDetail()
+    }
+  }, [isOpen, postId, fetchPostDetail])
 
   const handleDeletePost = async () => {
     if (!postDetail) return
@@ -408,10 +411,13 @@ export default function PostDetailModal({
                             onClick={() => openLightbox(idx)}
                             className="aspect-square rounded-lg overflow-hidden hover:opacity-80 transition-opacity border border-gray-200"
                           >
-                            <img
+                            <Image
                               src={img}
                               alt={`Imagen ${idx + 1}`}
+                              width={300}
+                              height={300}
                               className="w-full h-full object-cover"
+                              unoptimized
                             />
                           </button>
                         ))}
