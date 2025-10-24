@@ -8,7 +8,6 @@ interface StatsCardProps {
   change: string
   changeType: 'positive' | 'negative' | 'neutral'
   icon: string
-  type: 'users' | 'posts' | 'subscriptions'
   onPeriodChange: (period: string) => void
   isLoading?: boolean
 }
@@ -19,7 +18,6 @@ export default function StatsCard({
   change,
   changeType,
   icon,
-  type,
   onPeriodChange,
   isLoading = false
 }: StatsCardProps) {
