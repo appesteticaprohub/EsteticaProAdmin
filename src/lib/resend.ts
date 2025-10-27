@@ -7,9 +7,15 @@ if (!process.env.RESEND_API_KEY) {
 
 export const resend = new Resend(process.env.RESEND_API_KEY)
 
+// Detectar ambiente
+const isProduction = process.env.NODE_ENV === 'production' && 
+                     process.env.NEXT_PUBLIC_APP_URL?.includes('esteticapro-admin.netlify.app')
+
 // Configuración base para emails
 export const EMAIL_CONFIG = {
-  from: process.env.RESEND_FROM_EMAIL || 'EsteticaProHub <onboarding@resend.dev>',
+  from: isProduction 
+    ? 'EsteticaProHub <noreply@esteticaprohub.com>'
+    : process.env.RESEND_FROM_EMAIL || 'EsteticaProHub <onboarding@resend.dev>',
   baseUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
 }
 
