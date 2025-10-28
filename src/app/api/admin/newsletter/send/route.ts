@@ -49,7 +49,8 @@ export async function POST(request: NextRequest) {
       post_ids, 
       custom_subject,
       batchSize = 100,
-      offset = 0 
+      offset = 0,
+      subscriptionStatus = 'all'
     } = body
 
     if (!post_ids || !Array.isArray(post_ids) || post_ids.length === 0) {
@@ -74,12 +75,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Obtener destinatarios (usuarios con email_content = true) CON PAGINACIÓN
-    const { data: preferences, error: recipientsError } = await supabase
+    // Obtener destinatarios (usuarios con email_content = true) CON PAGINACIÓN Y FILTRO
+    let query = supabase
       .from('notification_preferences')
-      .select('user_id, profiles!inner(id, email, full_name)')
+      .select('user_id, profiles!inner(id, email, full_name, subscription_status, is_banned)')
       .eq('email_content', true)
-      .range(offset, offset + batchSize - 1)
+      .eq('profiles.is_banned', false); // Excluir usuarios baneados
+
+    // Aplicar filtro de subscription_status si no es "all"
+    if (subscriptionStatus && subscriptionStatus !== 'all') {
+      query = query.eq('profiles.subscription_status', subscriptionStatus);
+    }
+
+    // Aplicar paginación
+    query = query.range(offset, offset + batchSize - 1);
+
+    const { data: preferences, error: recipientsError } = await query;
 
     const recipients: RecipientData[] = (preferences as PreferenceFromDB[] | null)?.map((pref) => {
       const profile = Array.isArray(pref.profiles) ? pref.profiles[0] : pref.profiles
@@ -92,6 +103,7 @@ export async function POST(request: NextRequest) {
 
     console.log('📧 Recipients en este bloque:', recipients.length)
     console.log('📧 Offset actual:', offset)
+    console.log('📧 Subscription Status filter:', subscriptionStatus)
 
     if (recipientsError || !recipients) {
       return NextResponse.json(

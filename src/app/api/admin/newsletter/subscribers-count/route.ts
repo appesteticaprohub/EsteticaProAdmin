@@ -5,11 +5,23 @@ export async function GET(request: Request) {
   try {
     const supabase = createServerSupabaseAdminClient();
 
-    // Contar suscriptores desde notification_preferences (igual que el envío)
-    const { data: preferences, error } = await supabase
+    // Obtener parámetro de filtro de subscription_status
+    const { searchParams } = new URL(request.url);
+    const subscriptionStatus = searchParams.get('subscription_status') || 'all';
+
+    // Construir query con filtro opcional
+    let query = supabase
       .from('notification_preferences')
-      .select('user_id, profiles!inner(id, email)')
-      .eq('email_content', true);
+      .select('user_id, profiles!inner(id, email, subscription_status, is_banned)')
+      .eq('email_content', true)
+      .eq('profiles.is_banned', false); // Excluir usuarios baneados
+
+    // Aplicar filtro de subscription_status si no es "all"
+    if (subscriptionStatus && subscriptionStatus !== 'all') {
+      query = query.eq('profiles.subscription_status', subscriptionStatus);
+    }
+
+    const { data: preferences, error } = await query;
 
     if (error) {
       console.error('Error al contar suscriptores:', error);
@@ -27,8 +39,9 @@ export async function GET(request: Request) {
 
     const count = validRecipients.length;
 
-    return NextResponse.json({ 
-      count: count
+   return NextResponse.json({ 
+      count: count,
+      subscription_status: subscriptionStatus
     });
 
   } catch (error) {

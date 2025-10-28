@@ -32,6 +32,7 @@ export default function NewsletterPanel() {
   const [selectedPosts, setSelectedPosts] = useState<string[]>([])
   const [totalRecipients, setTotalRecipients] = useState<number>(0)
   const [batchSize, setBatchSize] = useState<number>(100)
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string>('all')
   const [currentOffset, setCurrentOffset] = useState<number>(0)
   const [sentCount, setSentCount] = useState<number>(0)
   const [failedCount, setFailedCount] = useState<number>(0)
@@ -56,7 +57,11 @@ export default function NewsletterPanel() {
 
   const fetchRecipientsCount = async () => {
     try {
-      const response = await fetch('/api/admin/newsletter/subscribers-count')
+      const url = subscriptionStatus === 'all' 
+        ? '/api/admin/newsletter/subscribers-count'
+        : `/api/admin/newsletter/subscribers-count?subscription_status=${subscriptionStatus}`;
+      
+      const response = await fetch(url)
       const data = await response.json()
       
       if (response.ok) {
@@ -127,6 +132,10 @@ export default function NewsletterPanel() {
     fetchSettings()
     fetchRecipientsCount()
   }, [])
+
+  useEffect(() => {
+    fetchRecipientsCount()
+  }, [subscriptionStatus])
 
   useEffect(() => {
     if (selectedPosts.length > 0) {
@@ -204,7 +213,8 @@ export default function NewsletterPanel() {
         body: JSON.stringify({
           post_ids: selectedPosts,
           batchSize: batchSize,
-          offset: currentOffset
+          offset: currentOffset,
+          subscriptionStatus: subscriptionStatus
         })
       })
 
@@ -455,28 +465,57 @@ export default function NewsletterPanel() {
             
             <div className="space-y-4">
               {/* Estadísticas */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-blue-50 p-3 rounded-lg">
-                  <p className="text-xs text-gray-600 mb-1">Total Destinatarios</p>
-                  <p className="text-xl font-bold text-blue-600">
-                    {totalRecipients.toLocaleString()}
-                  </p>
-                </div>
-                <div className="bg-gray-50 p-3 rounded-lg">
+              <div className="space-y-3">
+                {/* Filtro de Subscription Status */}
+                <div className="bg-purple-50 p-3 rounded-lg">
                   <label className="text-xs text-gray-600 block mb-1">
-                    Tamaño de Bloque
+                    Filtrar por Estado de Suscripción
                   </label>
                   <select
-                  value={batchSize}
-                  onChange={(e) => setBatchSize(Number(e.target.value))}
-                  disabled={isSending || sentCount > 0}
-                  className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                  <option value={200}>200</option>
-                  <option value={500}>500</option>
-                </select>
+                    value={subscriptionStatus}
+                    onChange={(e) => {
+                      setSubscriptionStatus(e.target.value)
+                      // Resetear progreso si cambia el filtro
+                      setCurrentOffset(0)
+                      setSentCount(0)
+                      setFailedCount(0)
+                      setHasMoreToSend(true)
+                    }}
+                    disabled={isSending || sentCount > 0}
+                    className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="all">Todos los usuarios</option>
+                    <option value="Active">Active (Activos)</option>
+                    <option value="GracePeriod">Grace Period (Período de Gracia)</option>
+                    <option value="Expired">Expired (Expirados)</option>
+                    <option value="Cancelled">Cancelled (Cancelados)</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-blue-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-600 mb-1">Total Destinatarios</p>
+                    <p className="text-xl font-bold text-blue-600">
+                      {totalRecipients.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <label className="text-xs text-gray-600 block mb-1">
+                      Tamaño de Bloque
+                    </label>
+                    <select
+                      value={batchSize}
+                      onChange={(e) => setBatchSize(Number(e.target.value))}
+                      disabled={isSending || sentCount > 0}
+                      className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value={5}>5 (prueba)</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={200}>200</option>
+                      <option value={500}>500</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
