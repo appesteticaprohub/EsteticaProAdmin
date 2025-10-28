@@ -34,7 +34,6 @@ export default function NewsletterPanel() {
   const [isSending, setIsSending] = useState<boolean>(false)
   const [hasMoreToSend, setHasMoreToSend] = useState<boolean>(true)
   const [loading, setLoading] = useState(true)
-  const [sending, setSending] = useState(false)
 
   const fetchSettings = async () => {
     try {
@@ -48,7 +47,7 @@ export default function NewsletterPanel() {
     }
   }
 
-  const fetchRecipientsCount = async () => {
+  const fetchRecipientsCount = useCallback(async () => {
     try {
       const url = subscriptionStatus === 'all' 
         ? '/api/admin/newsletter/subscribers-count'
@@ -66,7 +65,7 @@ export default function NewsletterPanel() {
       console.error('Error fetching recipients count:', error)
       alert('Error al obtener conteo de destinatarios')
     }
-  }
+  }, [subscriptionStatus])
 
   const fetchPosts = async () => {
     try {
@@ -98,11 +97,11 @@ export default function NewsletterPanel() {
     fetchPosts()
     fetchSettings()
     fetchRecipientsCount()
-  }, [])
+  }, [fetchRecipientsCount])
 
   useEffect(() => {
     fetchRecipientsCount()
-  }, [subscriptionStatus])
+  }, [subscriptionStatus, fetchRecipientsCount])
 
 
   const handlePostToggle = (postId: string) => {
@@ -141,7 +140,6 @@ export default function NewsletterPanel() {
     }
 
     setIsSending(true)
-    setSending(true)
 
     try {
       const response = await fetch('/api/admin/newsletter/send', {
@@ -189,7 +187,6 @@ export default function NewsletterPanel() {
       alert('Error al enviar la newsletter')
     } finally {
       setIsSending(false)
-      setSending(false)
     }
   }
 
