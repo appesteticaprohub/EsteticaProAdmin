@@ -8,14 +8,13 @@ import UserHistoryModal from './UserHistoryModal'
 import PostDetailModal from './PostDetailModal'
 
 const CATEGORIES = [
-  'Tratamientos Faciales',
-  'Tratamientos Corporales',
-  'Depilación',
-  'Maquillaje',
-  'Uñas',
-  'Masajes',
-  'Spa',
-  'Otros'
+  'Casos Clínicos',
+  'Complicaciones',
+  'Tendencias Facial',
+  'Tendencias Corporal',
+  'Tendencias Capilar',
+  'Tendencias Spa',
+  'Gestión Empresarial'
 ]
 
 export default function ContentModerationPanel() {
