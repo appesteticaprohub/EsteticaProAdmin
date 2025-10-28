@@ -8,6 +8,7 @@ interface Post {
   content: string
   author_name: string
   created_at: string
+  views_count: number
   likes_count: number
   comments_count: number
 }
@@ -245,9 +246,25 @@ export default function NewsletterPanel() {
     return `${day}/${month}/${year}, ${String(hours12).padStart(2, '0')}:${minutes} ${ampm}`
   }
 
+  const stripHtml = (html: string): string => {
+    // Crear un elemento temporal en el DOM para parsear el HTML
+    const tmp = document.createElement('div')
+    tmp.innerHTML = html
+    
+    // Obtener solo el texto, esto automáticamente elimina todas las etiquetas
+    const text = tmp.textContent || tmp.innerText || ''
+    
+    // Limpiar espacios múltiples y saltos de línea
+    return text.replace(/\s+/g, ' ').trim()
+  }
+
   const truncateContent = (content: string, maxLength: number = 150) => {
-    if (content.length <= maxLength) return content
-    return content.substring(0, maxLength) + '...'
+    // Primero limpiar el HTML
+    const plainText = stripHtml(content)
+    
+    // Luego truncar
+    if (plainText.length <= maxLength) return plainText
+    return plainText.substring(0, maxLength) + '...'
   }
 
   if (loading) {
@@ -332,6 +349,7 @@ export default function NewsletterPanel() {
                     <div className="flex items-center text-xs text-gray-500 space-x-4">
                       <span>Por {post.author_name}</span>
                       <span>{formatDate(post.created_at)}</span>
+                      <span>👁️ {post.views_count}</span>
                       <span>❤️ {post.likes_count}</span>
                       <span>💬 {post.comments_count}</span>
                     </div>
