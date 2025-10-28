@@ -6,16 +6,7 @@ import { PostsListResponse, PostWithAuthor, PostsFilters, PostsSortOptions } fro
 import BanUserModal from './BanUserModal'
 import UserHistoryModal from './UserHistoryModal'
 import PostDetailModal from './PostDetailModal'
-
-const CATEGORIES = [
-  'Casos Clínicos',
-  'Complicaciones',
-  'Tendencias Facial',
-  'Tendencias Corporal',
-  'Tendencias Capilar',
-  'Tendencias Spa',
-  'Gestión Empresarial'
-]
+import { CATEGORIES, getCategoryLabel } from '@/lib/categories'
 
 export default function ContentModerationPanel() {
   // Estados de datos
@@ -255,7 +246,7 @@ export default function ContentModerationPanel() {
             >
               <option value="">Todas las categorías</option>
               {CATEGORIES.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
+                <option key={cat.value} value={cat.value}>{cat.label}</option>
               ))}
             </select>
           </div>
@@ -490,7 +481,7 @@ export default function ContentModerationPanel() {
                       </div>
                       {post.category && (
                         <span className="inline-block px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">
-                          {post.category}
+                          {getCategoryLabel(post.category)}
                         </span>
                       )}
                     </div>

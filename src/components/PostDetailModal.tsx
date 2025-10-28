@@ -7,6 +7,7 @@ import { PostDetailResponse } from '@/types/admin'
 import ImageLightbox from './ImageLightbox'
 import BanUserModal from './BanUserModal'
 import CommentsTreeView from './CommentsTreeView'
+import { CATEGORIES, getCategoryLabel } from '@/lib/categories'
 
 interface PostDetailModalProps {
   isOpen: boolean
@@ -193,19 +194,6 @@ export default function PostDetailModal({
     }
   }
 
-  const getCategoryLabel = (value: string) => {
-    const categories = [
-      { value: 'casos-clinicos', label: 'Casos Clínicos' },
-      { value: 'complicaciones', label: 'Complicaciones' },
-      { value: 'tendencias-facial', label: 'Tendencias Facial' },
-      { value: 'tendencias-corporal', label: 'Tendencias Corporal' },
-      { value: 'tendencias-capilar', label: 'Tendencias Capilar' },
-      { value: 'tendencias-spa', label: 'Tendencias Spa' },
-      { value: 'gestion-empresarial', label: 'Gestión Empresarial' }
-    ]
-    return categories.find(cat => cat.value === value)?.label || value
-  }
-
   const handleBanUser = async (reason: string) => {
     if (!postDetail) return
 
@@ -303,7 +291,7 @@ export default function PostDetailModal({
                             {!isEditingCategory ? (
                               <>
                                 <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-medium">
-                                  {postDetail.post.category || 'Sin categoría'}
+                                  {getCategoryLabel(postDetail.post.category)}
                                 </span>
                                 {!postDetail.post.is_deleted && (
                                   <button
@@ -327,13 +315,9 @@ export default function PostDetailModal({
                                   disabled={actionLoading}
                                 >
                                   <option value="">Seleccionar categoría</option>
-                                  <option value="casos-clinicos">Casos Clínicos</option>
-                                  <option value="complicaciones">Complicaciones</option>
-                                  <option value="tendencias-facial">Tendencias Facial</option>
-                                  <option value="tendencias-corporal">Tendencias Corporal</option>
-                                  <option value="tendencias-capilar">Tendencias Capilar</option>
-                                  <option value="tendencias-spa">Tendencias Spa</option>
-                                  <option value="gestion-empresarial">Gestión Empresarial</option>
+                                  {CATEGORIES.map(cat => (
+                                    <option key={cat.value} value={cat.value}>{cat.label}</option>
+                                  ))}
                                 </select>
                                 <button
                                   onClick={handleUpdateCategory}

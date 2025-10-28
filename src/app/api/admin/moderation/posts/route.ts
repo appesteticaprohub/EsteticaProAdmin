@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 import { createServerSupabaseClient } from '@/lib/server-supabase'
+import { CATEGORY_LABELS, getCategoryLabel } from '@/lib/categories'
 
 // Interfaces para tipar los datos de Supabase
 interface AuthorFromDB {
@@ -175,7 +176,8 @@ export async function GET(request: NextRequest) {
 
     // Aplicar resto de filtros
     if (category) {
-      postsQuery = postsQuery.eq('category', category)
+      // Usar ilike para búsqueda case-insensitive y flexible
+      postsQuery = postsQuery.ilike('category', category)
     }
 
     if (dateFrom) {
