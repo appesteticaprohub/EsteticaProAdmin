@@ -23,9 +23,9 @@ export interface SendEmailOptions {
   html: string
   templateKey?: string
   userId?: string
+  skipLogging?: boolean  // 👈 NUEVO: Permite omitir el logging automático
 }
 
-// Función principal para enviar emails
 export async function sendEmail(options: SendEmailOptions) {
   try {
     const response = await resend.emails.send({
@@ -34,9 +34,10 @@ export async function sendEmail(options: SendEmailOptions) {
       subject: options.subject,
       html: options.html,
     })
-
+    
     // Log del envío en la base de datos si se proporciona templateKey y userId
-    if (options.templateKey && options.userId) {
+    // Y si NO se ha indicado skipLogging (para evitar duplicados en broadcasts)
+    if (options.templateKey && options.userId && !options.skipLogging) {
       await logEmailSend({
         user_id: options.userId,
         template_key: options.templateKey,
@@ -45,7 +46,7 @@ export async function sendEmail(options: SendEmailOptions) {
         resend_id: response.data?.id || null
       })
     }
-
+    
     return {
       success: true,
       data: response,
@@ -54,8 +55,8 @@ export async function sendEmail(options: SendEmailOptions) {
   } catch (error) {
     console.error('Error enviando email:', error)
     
-    // Log del error si se proporciona la información
-    if (options.templateKey && options.userId) {
+    // Log del error si se proporciona la información y NO se ha saltado el logging
+    if (options.templateKey && options.userId && !options.skipLogging) {
       await logEmailSend({
         user_id: options.userId,
         template_key: options.templateKey,
@@ -64,7 +65,7 @@ export async function sendEmail(options: SendEmailOptions) {
         error_message: error instanceof Error ? error.message : 'Error desconocido'
       })
     }
-
+    
     return {
       success: false,
       data: null,

@@ -224,7 +224,8 @@ async function sendNewsletterToRecipients(recipients: RecipientData[], posts: Po
         subject: subject,
         html: finalHtml,
         templateKey: 'posts_newsletter',
-        userId: recipient.user_id
+        userId: recipient.user_id,
+        skipLogging: true  // 👈 NUEVO: Evita el logging automático para que solo lo haga el batch
       })
 
       console.log('📬 Resultado para', recipient.email, ':', emailResult)

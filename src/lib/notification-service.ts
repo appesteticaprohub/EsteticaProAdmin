@@ -253,7 +253,8 @@ export class NotificationBroadcastService {
           subject: personalizedSubject,
           html: personalizedHtml,
           templateKey: 'broadcast',
-          userId: user.id
+          userId: user.id,
+          skipLogging: true  // 👈 NUEVO: Evita el logging automático para que solo lo haga el batch
         })
 
         // Log del envío
