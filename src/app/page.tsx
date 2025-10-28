@@ -70,7 +70,7 @@ export default function AdminDashboard() {
   return (
     <div className="flex">
       <Sidebar currentPage={currentPage} onPageChange={setCurrentPage} />
-      <div className="flex-1">
+      <div className="flex-1 p-6 overflow-x-auto">
         {renderContent()}
       </div>
     </div>
