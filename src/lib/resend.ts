@@ -7,13 +7,18 @@ if (!process.env.RESEND_API_KEY) {
 
 export const resend = new Resend(process.env.RESEND_API_KEY)
 
-// Detectar ambiente usando variable de Vercel
-const isProduction = process.env.VERCEL_ENV === 'production'
-
 // Configuración base para emails
 export const EMAIL_CONFIG = {
   from: process.env.RESEND_FROM_EMAIL || 'EsteticaProHub <onboarding@resend.dev>',
   baseUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+}
+
+// Tipo para la respuesta de Resend
+interface ResendResponse {
+  data?: {
+    id?: string
+  } | null
+  error?: string | Record<string, unknown> | null
 }
 
 // Tipos para el envío de emails
@@ -36,7 +41,7 @@ export async function sendEmail(options: SendEmailOptions) {
     })
     
     // Resend puede devolver response.data o response.error
-    const responseData = response as any
+    const responseData = response as ResendResponse
     
     // Verificar si Resend devolvió un error
     if (responseData.error) {
