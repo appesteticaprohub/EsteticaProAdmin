@@ -20,12 +20,6 @@ interface NewsletterSettings {
   subscriber_count?: number
 }
 
-interface NewsletterPreview {
-  subject: string
-  html_content: string
-  recipients_count: number
-}
-
 export default function NewsletterPanel() {
   const [settings, setSettings] = useState<NewsletterSettings | null>(null)
   const [posts, setPosts] = useState<Post[]>([])
@@ -38,10 +32,8 @@ export default function NewsletterPanel() {
   const [failedCount, setFailedCount] = useState<number>(0)
   const [isSending, setIsSending] = useState<boolean>(false)
   const [hasMoreToSend, setHasMoreToSend] = useState<boolean>(true)
-  const [preview, setPreview] = useState<NewsletterPreview | null>(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
 
   const fetchSettings = async () => {
     try {
@@ -101,32 +93,6 @@ export default function NewsletterPanel() {
     }
   }
 
-  const generatePreview = useCallback(async () => {
-    if (selectedPosts.length === 0) return
-
-    try {
-      const response = await fetch('/api/admin/newsletter/preview', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ post_ids: selectedPosts })
-      })
-      
-      if (response.ok) {
-        const result = await response.json()
-        const data = result.data || result
-        setPreview({
-          subject: data.subject,
-          html_content: data.html_preview,
-          recipients_count: data.recipient_count || 0
-        })
-      }
-    } catch (error) {
-      console.error('Error generating preview:', error)
-    }
-  }, [selectedPosts])
-
   useEffect(() => {
     fetchPosts()
     fetchSettings()
@@ -137,34 +103,6 @@ export default function NewsletterPanel() {
     fetchRecipientsCount()
   }, [subscriptionStatus])
 
-  useEffect(() => {
-    if (selectedPosts.length > 0) {
-      generatePreview()
-    }
-  }, [selectedPosts, generatePreview])
-
-  const toggleNewsletterStatus = async () => {
-    if (!settings) return
-
-    try {
-      const response = await fetch('/api/admin/newsletter/settings', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          is_enabled: !settings.is_enabled
-        })
-      })
-
-      if (response.ok) {
-        const updatedSettings = await response.json()
-        setSettings(updatedSettings.data || updatedSettings)
-      }
-    } catch (error) {
-      console.error('Error updating newsletter settings:', error)
-    }
-  }
 
   const handlePostToggle = (postId: string) => {
     setSelectedPosts(prev => 
@@ -260,8 +198,6 @@ export default function NewsletterPanel() {
     setFailedCount(0)
     setHasMoreToSend(true)
     setSelectedPosts([])
-    setPreview(null)
-    setShowPreview(false)
     alert('✅ Listo para nuevo envío')
   }
 
@@ -415,45 +351,15 @@ export default function NewsletterPanel() {
 
         {/* Panel de control */}
         <div className="space-y-6">
-          {/* Estado del newsletter */}
+          {/* Información del newsletter */}
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Estado del Newsletter</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Información</h3>
             
-            <div className="mb-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">
-                  Newsletter Global
-                </span>
-                <button
-                  onClick={toggleNewsletterStatus}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    settings?.is_enabled ? 'bg-blue-600' : 'bg-gray-200'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      settings?.is_enabled ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                {settings?.is_enabled ? 'Activado' : 'Desactivado'}
-              </p>
-            </div>
-
             <div className="space-y-3">
               <div>
                 <span className="text-sm text-gray-600">Último envío:</span>
                 <p className="text-sm font-medium text-gray-900">
                   {formatDate(settings?.last_sent_at || null)}
-                </p>
-              </div>
-              
-              <div>
-                <span className="text-sm text-gray-600">Destinatarios:</span>
-                <p className="text-sm font-medium text-gray-900">
-                  {settings?.subscriber_count || preview?.recipients_count || 0} usuarios
                 </p>
               </div>
             </div>
@@ -548,16 +454,8 @@ export default function NewsletterPanel() {
               {/* Botones de acción */}
               <div className="space-y-2">
                 <button
-                  onClick={() => setShowPreview(!showPreview)}
-                  disabled={selectedPosts.length === 0}
-                  className="w-full px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
-                >
-                  {showPreview ? '👁️ Ocultar' : '👁️ Ver'} Preview
-                </button>
-
-                <button
                   onClick={sendNewsletter}
-                  disabled={!settings?.is_enabled || selectedPosts.length === 0 || isSending || !hasMoreToSend}
+                  disabled={selectedPosts.length === 0 || isSending || !hasMoreToSend}
                   className="w-full px-4 py-3 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                 >
                   {isSending 
@@ -577,39 +475,9 @@ export default function NewsletterPanel() {
                     🔄 Preparar Nuevo Envío
                   </button>
                 )}
-
-                {!settings?.is_enabled && (
-                  <p className="text-xs text-red-600 text-center">
-                    ⚠️ Newsletter desactivado globalmente
-                  </p>
-                )}
               </div>
             </div>
           </div>
-
-          {/* Preview */}
-          {showPreview && preview && (
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Preview</h3>
-              
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-                  <p className="text-sm font-medium text-gray-900">
-                    Asunto: {preview.subject}
-                  </p>
-                </div>
-                
-                <div 
-                  className="p-4 text-sm max-h-64 overflow-y-auto"
-                  dangerouslySetInnerHTML={{ __html: preview.html_content }}
-                />
-              </div>
-              
-              <p className="text-xs text-gray-500 mt-2">
-                Este email será enviado a {preview.recipients_count} usuarios
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>
