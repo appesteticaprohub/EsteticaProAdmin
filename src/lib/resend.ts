@@ -7,15 +7,12 @@ if (!process.env.RESEND_API_KEY) {
 
 export const resend = new Resend(process.env.RESEND_API_KEY)
 
-// Detectar ambiente
-const isProduction = process.env.NODE_ENV === 'production' && 
-                     process.env.NEXT_PUBLIC_APP_URL?.includes('estetica-pro-admin-672420pt9-appesteticaprohubs-projects.vercel.app')
+// Detectar ambiente usando variable de Vercel
+const isProduction = process.env.VERCEL_ENV === 'production'
 
 // Configuración base para emails
 export const EMAIL_CONFIG = {
-  from: isProduction 
-    ? 'EsteticaProHub <noreply@esteticaprohub.com>'
-    : process.env.RESEND_FROM_EMAIL || 'EsteticaProHub <onboarding@resend.dev>',
+  from: process.env.RESEND_FROM_EMAIL || 'EsteticaProHub <onboarding@resend.dev>',
   baseUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
 }
 
