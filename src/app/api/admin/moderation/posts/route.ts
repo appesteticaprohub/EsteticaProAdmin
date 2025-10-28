@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 import { createServerSupabaseClient } from '@/lib/server-supabase'
-import { CATEGORY_LABELS, getCategoryLabel } from '@/lib/categories'
 
 // Interfaces para tipar los datos de Supabase
 interface AuthorFromDB {
