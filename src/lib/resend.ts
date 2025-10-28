@@ -9,7 +9,7 @@ export const resend = new Resend(process.env.RESEND_API_KEY)
 
 // Detectar ambiente
 const isProduction = process.env.NODE_ENV === 'production' && 
-                     process.env.NEXT_PUBLIC_APP_URL?.includes('https://estetica-pro-admin-672420pt9-appesteticaprohubs-projects.vercel.app')
+                     process.env.NEXT_PUBLIC_APP_URL?.includes('estetica-pro-admin-672420pt9-appesteticaprohubs-projects.vercel.app')
 
 // Configuración base para emails
 export const EMAIL_CONFIG = {
