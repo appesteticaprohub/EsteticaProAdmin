@@ -30,6 +30,13 @@ export default function NewsletterPanel() {
   const [settings, setSettings] = useState<NewsletterSettings | null>(null)
   const [posts, setPosts] = useState<Post[]>([])
   const [selectedPosts, setSelectedPosts] = useState<string[]>([])
+  const [totalRecipients, setTotalRecipients] = useState<number>(0)
+  const [batchSize, setBatchSize] = useState<number>(100)
+  const [currentOffset, setCurrentOffset] = useState<number>(0)
+  const [sentCount, setSentCount] = useState<number>(0)
+  const [failedCount, setFailedCount] = useState<number>(0)
+  const [isSending, setIsSending] = useState<boolean>(false)
+  const [hasMoreToSend, setHasMoreToSend] = useState<boolean>(true)
   const [preview, setPreview] = useState<NewsletterPreview | null>(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -44,6 +51,22 @@ export default function NewsletterPanel() {
       }
     } catch (error) {
       console.error('Error fetching newsletter settings:', error)
+    }
+  }
+
+  const fetchRecipientsCount = async () => {
+    try {
+      const response = await fetch('/api/admin/newsletter/subscribers-count')
+      const data = await response.json()
+      
+      if (response.ok) {
+        setTotalRecipients(data.count || 0)
+      } else {
+        alert('Error al obtener conteo de destinatarios')
+      }
+    } catch (error) {
+      console.error('Error fetching recipients count:', error)
+      alert('Error al obtener conteo de destinatarios')
     }
   }
 
@@ -100,8 +123,9 @@ export default function NewsletterPanel() {
   }, [selectedPosts])
 
   useEffect(() => {
-    fetchSettings()
     fetchPosts()
+    fetchSettings()
+    fetchRecipientsCount()
   }, [])
 
   useEffect(() => {
@@ -155,47 +179,80 @@ export default function NewsletterPanel() {
       return
     }
 
-    const confirmSend = confirm(
-      `¿Estás seguro de enviar la newsletter?\n\n` +
-      `Posts seleccionados: ${selectedPosts.length}\n` +
-      `Destinatarios: ${preview?.recipients_count || 0} usuarios\n\n` +
-      `Esta acción no se puede deshacer.`
-    )
+    // Solo confirmar al inicio
+    if (currentOffset === 0) {
+      const confirmSend = confirm(
+        `¿Estás seguro de enviar la newsletter?\n\n` +
+        `Posts seleccionados: ${selectedPosts.length}\n` +
+        `Destinatarios totales: ${totalRecipients} usuarios\n` +
+        `Tamaño de bloque: ${batchSize} emails\n\n` +
+        `Podrás enviar bloque por bloque manualmente.`
+      )
 
-    if (!confirmSend) return
+      if (!confirmSend) return
+    }
 
+    setIsSending(true)
     setSending(true)
+
     try {
       const response = await fetch('/api/admin/newsletter/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ post_ids: selectedPosts })
+        body: JSON.stringify({
+          post_ids: selectedPosts,
+          batchSize: batchSize,
+          offset: currentOffset
+        })
       })
 
       if (response.ok) {
         const result = await response.json()
         const data = result.data || result
-        alert(`¡Newsletter enviada exitosamente!\n\nEmails enviados: ${data.emails_sent || 0}\nFallidos: ${data.emails_failed || 0}`)
-        
-        // Actualizar configuración para mostrar última fecha de envío
-        fetchSettings()
-        
-        // Limpiar selección
-        setSelectedPosts([])
-        setPreview(null)
-        setShowPreview(false)
+
+        // Actualizar contadores
+        setSentCount(prev => prev + (data.emails_sent || 0))
+        setFailedCount(prev => prev + (data.emails_failed || 0))
+        setCurrentOffset(data.nextOffset || 0)
+        setHasMoreToSend(data.hasMore || false)
+
+        if (data.hasMore) {
+          alert(`✅ Bloque enviado correctamente!\n\n` +
+                `Exitosos: ${data.emails_sent || 0}\n` +
+                `Fallidos: ${data.emails_failed || 0}\n\n` +
+                `Progreso: ${sentCount + (data.emails_sent || 0)} / ${totalRecipients}`)
+        } else {
+          alert(`🎉 ¡Newsletter completada!\n\n` +
+                `Total enviados: ${sentCount + (data.emails_sent || 0)}\n` +
+                `Total fallidos: ${failedCount + (data.emails_failed || 0)}`)
+          
+          // Actualizar configuración
+          fetchSettings()
+        }
       } else {
         const error = await response.json()
-        alert(`Error al enviar newsletter: ${error.message}`)
+        alert(`Error al enviar newsletter: ${error.error || error.message}`)
       }
     } catch (error) {
       console.error('Error sending newsletter:', error)
       alert('Error al enviar la newsletter')
     } finally {
+      setIsSending(false)
       setSending(false)
     }
+  }
+
+  const resetSending = () => {
+    setCurrentOffset(0)
+    setSentCount(0)
+    setFailedCount(0)
+    setHasMoreToSend(true)
+    setSelectedPosts([])
+    setPreview(null)
+    setShowPreview(false)
+    alert('✅ Listo para nuevo envío')
   }
 
   const formatDate = (dateString: string | null | undefined) => {
@@ -392,32 +449,102 @@ export default function NewsletterPanel() {
             </div>
           </div>
 
-          {/* Acciones */}
+          {/* Control de Envío por Bloques */}
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Acciones</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Control de Envío</h3>
             
-            <div className="space-y-3">
-              <button
-                onClick={() => setShowPreview(!showPreview)}
-                disabled={selectedPosts.length === 0}
-                className="w-full px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
-              >
-                {showPreview ? 'Ocultar' : 'Ver'} Preview
-              </button>
+            <div className="space-y-4">
+              {/* Estadísticas */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Total Destinatarios</p>
+                  <p className="text-xl font-bold text-blue-600">
+                    {totalRecipients.toLocaleString()}
+                  </p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <label className="text-xs text-gray-600 block mb-1">
+                    Tamaño de Bloque
+                  </label>
+                  <select
+                  value={batchSize}
+                  onChange={(e) => setBatchSize(Number(e.target.value))}
+                  disabled={isSending || sentCount > 0}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={200}>200</option>
+                  <option value={500}>500</option>
+                </select>
+                </div>
+              </div>
 
-              <button
-                onClick={sendNewsletter}
-                disabled={!settings?.is_enabled || selectedPosts.length === 0 || sending}
-                className="w-full px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-              >
-                {sending ? 'Enviando...' : 'Enviar Newsletter'}
-              </button>
-
-              {!settings?.is_enabled && (
-                <p className="text-xs text-red-600">
-                  Newsletter desactivado globalmente
-                </p>
+              {/* Barra de progreso */}
+              {sentCount > 0 && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span className="font-medium">Progreso del Envío</span>
+                    <span className="font-bold">
+                      {sentCount.toLocaleString()} / {totalRecipients.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="bg-green-500 h-full transition-all duration-300 flex items-center justify-center text-[10px] text-white font-bold"
+                      style={{ width: `${Math.min((sentCount / totalRecipients) * 100, 100)}%` }}
+                    >
+                      {Math.round((sentCount / totalRecipients) * 100)}%
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-green-600 font-medium">✅ {sentCount.toLocaleString()}</span>
+                    {failedCount > 0 && (
+                      <span className="text-red-600 font-medium">❌ {failedCount.toLocaleString()}</span>
+                    )}
+                  </div>
+                </div>
               )}
+
+              {/* Botones de acción */}
+              <div className="space-y-2">
+                <button
+                  onClick={() => setShowPreview(!showPreview)}
+                  disabled={selectedPosts.length === 0}
+                  className="w-full px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  {showPreview ? '👁️ Ocultar' : '👁️ Ver'} Preview
+                </button>
+
+                <button
+                  onClick={sendNewsletter}
+                  disabled={!settings?.is_enabled || selectedPosts.length === 0 || isSending || !hasMoreToSend}
+                  className="w-full px-4 py-3 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isSending 
+                    ? '⏳ Enviando...' 
+                    : !hasMoreToSend 
+                      ? '✅ Envío Completado' 
+                      : sentCount > 0 
+                        ? `📤 Enviar Siguiente Bloque (${Math.min(batchSize, totalRecipients - currentOffset)} emails)` 
+                        : '📧 Iniciar Envío por Bloques'}
+                </button>
+
+                {!hasMoreToSend && sentCount > 0 && (
+                  <button
+                    onClick={resetSending}
+                    className="w-full px-4 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                  >
+                    🔄 Preparar Nuevo Envío
+                  </button>
+                )}
+
+                {!settings?.is_enabled && (
+                  <p className="text-xs text-red-600 text-center">
+                    ⚠️ Newsletter desactivado globalmente
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 

@@ -35,15 +35,46 @@ export async function sendEmail(options: SendEmailOptions) {
       html: options.html,
     })
     
+    // Resend puede devolver response.data o response.error
+    const responseData = response as any
+    
+    // Verificar si Resend devolvió un error
+    if (responseData.error) {
+      console.error('❌ Resend error:', responseData.error)
+      
+      // Log del error si se proporciona la información y NO se ha saltado el logging
+      if (options.templateKey && options.userId && !options.skipLogging) {
+        await logEmailSend({
+          user_id: options.userId,
+          template_key: options.templateKey,
+          email: options.to,
+          status: 'failed',
+          error_message: typeof responseData.error === 'string' 
+            ? responseData.error 
+            : JSON.stringify(responseData.error)
+        })
+      }
+      
+      return {
+        success: false,
+        data: response,
+        error: typeof responseData.error === 'string' 
+          ? responseData.error 
+          : JSON.stringify(responseData.error)
+      }
+    }
+    
+    // Éxito real
+    console.log('✅ Email enviado exitosamente:', responseData.data?.id)
+    
     // Log del envío en la base de datos si se proporciona templateKey y userId
-    // Y si NO se ha indicado skipLogging (para evitar duplicados en broadcasts)
     if (options.templateKey && options.userId && !options.skipLogging) {
       await logEmailSend({
         user_id: options.userId,
         template_key: options.templateKey,
         email: options.to,
         status: 'sent',
-        resend_id: response.data?.id || null
+        resend_id: responseData.data?.id || null
       })
     }
     
@@ -53,7 +84,7 @@ export async function sendEmail(options: SendEmailOptions) {
       error: null
     }
   } catch (error) {
-    console.error('Error enviando email:', error)
+    console.error('❌ Excepción enviando email:', error)
     
     // Log del error si se proporciona la información y NO se ha saltado el logging
     if (options.templateKey && options.userId && !options.skipLogging) {

@@ -45,7 +45,12 @@ interface EmailLogEntry {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { post_ids, custom_subject } = body
+    const { 
+      post_ids, 
+      custom_subject,
+      batchSize = 100,
+      offset = 0 
+    } = body
 
     if (!post_ids || !Array.isArray(post_ids) || post_ids.length === 0) {
       return NextResponse.json(
@@ -69,12 +74,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Obtener destinatarios
-    // Obtener destinatarios (usuarios con email_content = true)
+    // Obtener destinatarios (usuarios con email_content = true) CON PAGINACIÓN
     const { data: preferences, error: recipientsError } = await supabase
       .from('notification_preferences')
       .select('user_id, profiles!inner(id, email, full_name)')
       .eq('email_content', true)
+      .range(offset, offset + batchSize - 1)
 
     const recipients: RecipientData[] = (preferences as PreferenceFromDB[] | null)?.map((pref) => {
       const profile = Array.isArray(pref.profiles) ? pref.profiles[0] : pref.profiles
@@ -85,8 +90,8 @@ export async function POST(request: NextRequest) {
       }
     }).filter((r): r is RecipientData => Boolean(r.email)) || []
 
-    console.log('📧 Recipients encontrados:', recipients.length)
-    console.log('📧 Recipients:', recipients)
+    console.log('📧 Recipients en este bloque:', recipients.length)
+    console.log('📧 Offset actual:', offset)
 
     if (recipientsError || !recipients) {
       return NextResponse.json(
@@ -137,34 +142,59 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Iniciar proceso de envío masivo
+    // Si no hay destinatarios en este bloque, significa que terminamos
+    if (recipients.length === 0) {
+      return NextResponse.json({
+        data: {
+          message: 'No hay más destinatarios en este bloque',
+          emails_sent: 0,
+          emails_failed: 0,
+          total_recipients: 0,
+          nextOffset: offset,
+          hasMore: false,
+          batchSize: 0
+        },
+        error: null
+      })
+    }
+
+    // Iniciar proceso de envío masivo del bloque actual
     const sendResult = await sendNewsletterToRecipients(
       recipients,
       postsWithProfiles,
       custom_subject || 'Lo Nuevo en EsteticaProHub'
     )
 
-    // Actualizar configuración de newsletter con última fecha de envío
-    console.log('📅 Actualizando last_sent_at para settings.id:', settings.id)
-    const { data: updatedSettings, error: updateError } = await supabase
-      .from('newsletter_settings')
-      .update({ last_sent_at: new Date().toISOString() })
-      .eq('id', settings.id)
-      .select()
-    
-    if (updateError) {
-      console.error('❌ Error actualizando last_sent_at:', updateError)
-    } else {
-      console.log('✅ last_sent_at actualizado:', updatedSettings)
+    // Calcular siguiente offset
+    const nextOffset = offset + recipients.length
+    const hasMore = recipients.length === batchSize
+
+    // Solo actualizar last_sent_at si es el último bloque
+    if (!hasMore) {
+      console.log('📅 Último bloque - Actualizando last_sent_at para settings.id:', settings.id)
+      const { data: updatedSettings, error: updateError } = await supabase
+        .from('newsletter_settings')
+        .update({ last_sent_at: new Date().toISOString() })
+        .eq('id', settings.id)
+        .select()
+      
+      if (updateError) {
+        console.error('❌ Error actualizando last_sent_at:', updateError)
+      } else {
+        console.log('✅ last_sent_at actualizado:', updatedSettings)
+      }
     }
 
     return NextResponse.json({
       data: {
-        message: 'Newsletter enviada exitosamente',
+        message: `Bloque enviado: ${sendResult.success_count} exitosos, ${sendResult.failed_count} fallidos`,
         emails_sent: sendResult.success_count,
         emails_failed: sendResult.failed_count,
         total_recipients: recipients.length,
-        posts_included: posts.length
+        posts_included: posts.length,
+        nextOffset: nextOffset,
+        hasMore: hasMore,
+        batchSize: recipients.length
       },
       error: null
     })
@@ -262,8 +292,8 @@ async function sendNewsletterToRecipients(recipients: RecipientData[], posts: Po
       })
     }
 
-    // Pequeña pausa para no saturar Resend
-    await new Promise(resolve => setTimeout(resolve, 100))
+    // Pausa de 600ms entre emails (máx 2 por segundo = 500ms + margen)
+    await new Promise(resolve => setTimeout(resolve, 600))
   }
 
   // Guardar logs en base de datos
