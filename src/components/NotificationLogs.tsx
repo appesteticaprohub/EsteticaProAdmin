@@ -34,8 +34,8 @@ interface LogsFilters {
   status?: string
   template_key?: string
   user_email?: string
-  start_date?: string
-  end_date?: string
+  date_from?: string
+  date_to?: string
   limit?: number
   offset?: number
 }
@@ -299,7 +299,7 @@ export default function NotificationLogs() {
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Estado
@@ -364,9 +364,25 @@ export default function NotificationLogs() {
               </label>
               <input
                 type="date"
-                value={filters.start_date || ''}
+                value={filters.date_from || ''}
                 onChange={(e) => {
-                  const newFilters = { ...filters, start_date: e.target.value || undefined, offset: 0 }
+                  const newFilters = { ...filters, date_from: e.target.value || undefined, offset: 0 }
+                  setFilters(newFilters)
+                  fetchLogsWithFilters(newFilters)
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Fecha hasta
+              </label>
+              <input
+                type="date"
+                value={filters.date_to || ''}
+                onChange={(e) => {
+                  const newFilters = { ...filters, date_to: e.target.value || undefined, offset: 0 }
                   setFilters(newFilters)
                   fetchLogsWithFilters(newFilters)
                 }}

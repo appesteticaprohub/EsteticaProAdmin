@@ -58,7 +58,9 @@ export async function GET(request: NextRequest) {
         emailQuery = emailQuery.gte('sent_at', filters.date_from)
       }
       if (filters.date_to) {
-        emailQuery = emailQuery.lte('sent_at', filters.date_to)
+        // Agregar 23:59:59 al final del día para incluir todo el día
+        const dateToEndOfDay = `${filters.date_to}T23:59:59.999Z`
+        emailQuery = emailQuery.lte('sent_at', dateToEndOfDay)
       }
 
       // Obtener datos con paginación
@@ -107,7 +109,9 @@ export async function GET(request: NextRequest) {
         notificationQuery = notificationQuery.gte('created_at', filters.date_from)
       }
       if (filters.date_to) {
-        notificationQuery = notificationQuery.lte('created_at', filters.date_to)
+        // Agregar 23:59:59 al final del día para incluir todo el día
+        const dateToEndOfDay = `${filters.date_to}T23:59:59.999Z`
+        notificationQuery = notificationQuery.lte('created_at', dateToEndOfDay)
       }
 
       const { data: notificationData, error: notificationError, count } = await notificationQuery
