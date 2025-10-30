@@ -1,3 +1,4 @@
+// src/lib/paypal.ts
 // Configuración de PayPal para la app admin
 const PAYPAL_CONFIG = {
   currency: 'USD',
@@ -31,7 +32,43 @@ async function getPayPalAccessToken(): Promise<string> {
 export async function updatePayPalSubscriptionPrice(subscriptionId: string, newPrice: string) {
   const accessToken = await getPayPalAccessToken();
   
-  // PayPal no permite cambiar el precio directamente, necesitamos usar "revise"
+  // PASO 1: Obtener el plan_id actual de la suscripción
+  console.log(`📋 Obteniendo plan_id de la suscripción ${subscriptionId}...`);
+  const subscriptionResponse = await fetch(`${PAYPAL_BASE_URL}/v1/billing/subscriptions/${subscriptionId}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!subscriptionResponse.ok) {
+    const errorText = await subscriptionResponse.text();
+    console.error(`❌ Error obteniendo suscripción:`, errorText);
+    return {
+      status: subscriptionResponse.status,
+      ok: false,
+      data: null,
+      error: errorText
+    };
+  }
+
+  const subscriptionData = await subscriptionResponse.json();
+  const planId = subscriptionData.plan_id;
+  
+  if (!planId) {
+    console.error(`❌ No se encontró plan_id en la suscripción`);
+    return {
+      status: 400,
+      ok: false,
+      data: null,
+      error: 'plan_id not found in subscription'
+    };
+  }
+
+  console.log(`✅ plan_id obtenido: ${planId}`);
+  
+  // PASO 2: Actualizar el precio usando el plan_id correcto
   const response = await fetch(`${PAYPAL_BASE_URL}/v1/billing/subscriptions/${subscriptionId}/revise`, {
     method: 'POST',
     headers: {
@@ -39,7 +76,7 @@ export async function updatePayPalSubscriptionPrice(subscriptionId: string, newP
       'Authorization': `Bearer ${accessToken}`,
     },
     body: JSON.stringify({
-      plan_id: null, // Mantenemos el plan actual
+      plan_id: planId, // Usar el plan_id real
       pricing_revision: {
         pricing_scheme: {
           fixed_price: {
@@ -47,16 +84,30 @@ export async function updatePayPalSubscriptionPrice(subscriptionId: string, newP
             currency_code: PAYPAL_CONFIG.currency
           }
         }
-      },
-      effective_time: new Date().toISOString()
+      }
     }),
   });
+
+  let errorData = null;
+  let successData = null;
+
+  if (response.ok) {
+    successData = await response.json();
+  } else {
+    // Intentar parsear como JSON primero
+    const errorText = await response.text();
+    try {
+      errorData = JSON.parse(errorText);
+    } catch {
+      errorData = errorText;
+    }
+  }
 
   return {
     status: response.status,
     ok: response.ok,
-    data: response.ok ? await response.json() : null,
-    error: !response.ok ? await response.text() : null
+    data: successData,
+    error: errorData
   };
 }
 
@@ -78,7 +129,12 @@ export async function updateMultipleSubscriptionsPrices(subscriptions: Array<{id
         error: result.error
       });
 
-      console.log(`${result.ok ? '✅' : '❌'} Suscripción ${subscription.paypal_subscription_id}: ${result.status}`);
+      if (result.ok) {
+        console.log(`✅ Suscripción ${subscription.paypal_subscription_id}: ${result.status}`);
+      } else {
+        console.log(`❌ Suscripción ${subscription.paypal_subscription_id}: ${result.status}`);
+        console.log(`❌ Error detallado de PayPal:`, JSON.stringify(result.error, null, 2));
+      }
       
     } catch (error) {
       console.error(`❌ Error actualizando suscripción ${subscription.paypal_subscription_id}:`, error);

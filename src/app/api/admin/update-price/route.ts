@@ -1,7 +1,8 @@
+// src/app/api/admin/update-price/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase';
 import { updateMultipleSubscriptionsPrices } from '../../../../lib/paypal';
-import { NotificationBroadcastService } from '@/lib/notification-service';
 
 interface UpdatePriceRequest {
   newPrice: number;
@@ -110,26 +111,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Enviar notificaciones reales a todos los usuarios activos
-    let notificationResults = null
-    
-    try {
-      console.log(`📧 Enviando notificaciones de cambio de precio...`);
-      
-      const notifResult = await NotificationBroadcastService.sendPriceChangeNotification(newPrice.toString())
-      
-      if (notifResult.success && notifResult.data) {
-        notificationResults = notifResult.data
-        console.log(`✅ Notificaciones enviadas:`);
-        console.log(`   - Emails enviados: ${notifResult.data.emails_sent}`);
-        console.log(`   - Notificaciones in-app: ${notifResult.data.notifications_created}`);
-        console.log(`   - Errores: ${notifResult.data.errors}`);
-      } else {
-        console.error('❌ Error enviando notificaciones:', notifResult.error);
-      }
-    } catch (notifError) {
-      console.error('❌ Error en servicio de notificaciones:', notifError);
-    }
+    // NOTA: Las notificaciones ahora se envían manualmente por bloques
+    // usando el endpoint /api/admin/price-change/send-batch
+    console.log(`ℹ️ Precio actualizado. Usa el panel para enviar notificaciones por bloques.`);
 
     // Preparar mensaje de respuesta
     let message = `Precio actualizado exitosamente a $${newPrice.toFixed(2)} USD en la configuración base.`;
@@ -141,7 +125,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (activeSubscriptions && activeSubscriptions.length > 0) {
-      message += ` Se procesaron ${activeSubscriptions.length} suscripciones activas: ${successfulUpdates} exitosas, ${failedUpdates} fallidas.`;
+      message += ` Se procesaron ${activeSubscriptions.length} suscripciones activas en PayPal: ${successfulUpdates} exitosas, ${failedUpdates} fallidas.`;
       
       if (failedUpdates > 0) {
         message += ' Las suscripciones fallidas mantendrán el precio anterior hasta la próxima renovación.';
@@ -149,6 +133,8 @@ export async function POST(request: NextRequest) {
     } else {
       message += ' No se encontraron suscripciones activas para actualizar en PayPal.';
     }
+
+    message += ' Ahora puedes enviar notificaciones desde el panel de control.';
 
     return NextResponse.json({
       success: true,
@@ -160,12 +146,6 @@ export async function POST(request: NextRequest) {
         failed: failedUpdates,
         results: paypalResults
       },
-      notifications: notificationResults ? {
-        emails_sent: notificationResults.emails_sent,
-        notifications_created: notificationResults.notifications_created,
-        errors: notificationResults.errors,
-        total_users: notificationResults.total_users
-      } : null,
       newPrice,
       effectiveDate
     });
