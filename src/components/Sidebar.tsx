@@ -57,7 +57,8 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
         { id: 'moderation-posts', name: 'Posts', icon: '📝' },
         { id: 'moderation-banned', name: 'Usuarios Banneados', icon: '🚫' },
         { id: 'moderation-cleanup', name: 'Limpieza de Posts', icon: '🗑️' },
-        { id: 'moderation-anonymous-limit', name: 'Límite Anónimos', icon: '👁️' }
+        { id: 'moderation-anonymous-limit', name: 'Límite Anónimos', icon: '👁️' },
+        { id: 'moderation-logs', name: 'Logs de Moderación', icon: '📋' }
       ]
     },
     {

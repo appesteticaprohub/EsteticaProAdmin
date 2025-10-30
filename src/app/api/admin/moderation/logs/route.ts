@@ -150,3 +150,74 @@ export async function GET(request: NextRequest) {
     )
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    // Verificar que el usuario autenticado es admin
+    const supabaseAuth = await createServerSupabaseClient()
+    const { data: { user: adminUser }, error: authError } = await supabaseAuth.auth.getUser()
+
+    if (authError || !adminUser) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - No active session' },
+        { status: 401 }
+      )
+    }
+
+    const { data: adminProfile, error: adminError } = await supabaseAuth
+      .from('profiles')
+      .select('role')
+      .eq('id', adminUser.id)
+      .single()
+
+    if (adminError || !adminProfile || adminProfile.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden - Admin access required' },
+        { status: 403 }
+      )
+    }
+
+    const body = await request.json()
+    const { log_ids } = body
+
+    if (!log_ids || !Array.isArray(log_ids) || log_ids.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'log_ids array is required' },
+        { status: 400 }
+      )
+    }
+
+    const supabase = createServerSupabaseAdminClient()
+
+    // Eliminar los logs de moderación
+    const { error: deleteError, count } = await supabase
+      .from('moderation_logs')
+      .delete({ count: 'exact' })
+      .in('id', log_ids)
+
+    if (deleteError) {
+      console.error('Error deleting moderation logs:', deleteError)
+      return NextResponse.json(
+        { success: false, error: 'Failed to delete moderation logs' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        deleted_count: count || 0
+      }
+    })
+
+  } catch (error) {
+    console.error('Error in DELETE moderation logs:', error)
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Internal server error' 
+      },
+      { status: 500 }
+    )
+  }
+}
