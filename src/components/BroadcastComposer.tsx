@@ -141,7 +141,7 @@ export default function BroadcastComposer() {
       if (response.ok) {
         const result = await response.json()
         const data = result.data || result
-        const activeTemplates = (data.templates || []).filter((t: EmailTemplate) => t.is_active)
+        const activeTemplates = (data.templates || []).filter((t: EmailTemplate): t is EmailTemplate => t.is_active)
         setTemplates(activeTemplates)
       }
     } catch (error) {
@@ -458,7 +458,7 @@ export default function BroadcastComposer() {
                   </label>
                   <select
                     value={form.audience}
-                    onChange={(e) => setForm({ ...form, audience: e.target.value as any })}
+                    onChange={(e) => setForm({ ...form, audience: e.target.value as 'all' | 'active' | 'inactive' | 'by_country' | 'by_specialty' | 'by_email_list' })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="all">Todos los usuarios</option>
@@ -526,7 +526,7 @@ export default function BroadcastComposer() {
                   </label>
                   <select
                     value={form.priority}
-                    onChange={(e) => setForm({ ...form, priority: e.target.value as any })}
+                    onChange={(e) => setForm({ ...form, priority: e.target.value as 'normal' | 'important' | 'critical' | 'promotional' })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="normal">Normal</option>
