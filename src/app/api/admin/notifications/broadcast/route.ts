@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { NotificationBroadcastService } from '@/lib/notification-service'
-import type { BroadcastNotificationRequest, ApiResponse, BroadcastResponse, BroadcastAudience } from '@/types/admin'
+import type { BroadcastNotificationRequest, ApiResponse, BroadcastAudience } from '@/types/admin'
 
 export async function POST(request: NextRequest) {
   try {
