@@ -24,10 +24,11 @@ export async function GET() {
     }
 
     // Contar suscripciones activas con paypal_subscription_id
+    // Incluye: Active, Payment_Failed y Grace_Period
     const { count, error } = await supabase
       .from('profiles')
       .select('*', { count: 'exact', head: true })
-      .eq('subscription_status', 'Active')
+      .in('subscription_status', ['Active', 'Payment_Failed', 'Grace_Period'])
       .not('paypal_subscription_id', 'is', null)
       .eq('is_banned', false);
 

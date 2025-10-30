@@ -34,10 +34,11 @@ export async function POST(request: Request) {
     }
 
     // Obtener el bloque de suscripciones activas con paypal_subscription_id
+    // Incluye: Active, Payment_Failed y Grace_Period
     const { data: subscriptions, error: subsError, count } = await supabase
       .from('profiles')
       .select('id, email, paypal_subscription_id', { count: 'exact' })
-      .eq('subscription_status', 'Active')
+      .in('subscription_status', ['Active', 'Payment_Failed', 'Grace_Period'])
       .not('paypal_subscription_id', 'is', null)
       .eq('is_banned', false)
       .range(offset, offset + batchSize - 1);

@@ -535,9 +535,12 @@ export default function PriceManagement() {
 
             {/* Info importante */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-sm text-blue-800">
+              <p className="text-sm text-blue-800 mb-2">
                 ℹ️ <strong>Importante:</strong> Cada bloque toma ~1 segundo por suscripción debido al rate limit de PayPal. 
                 Un bloque de 100 tomará aproximadamente 2 minutos.
+              </p>
+              <p className="text-xs text-blue-700">
+                💡 <strong>Se incluyen:</strong> Active, Payment_Failed y Grace_Period (usuarios con suscripciones activas en PayPal)
               </p>
             </div>
 
