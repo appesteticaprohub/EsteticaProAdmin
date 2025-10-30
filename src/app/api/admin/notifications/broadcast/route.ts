@@ -14,21 +14,11 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Validar que message exista si se envía in_app
-    if ((body.type === 'in_app' || body.type === 'both') && !body.message) {
-      return NextResponse.json<ApiResponse<null>>({
-        data: null,
-        error: 'El campo message es requerido para notificaciones in-app'
-      }, { status: 400 })
-    }
+    // NOTA: Ya no validamos message aquí porque este endpoint solo calcula audiencia.
+    // La validación de message se hace en el endpoint send-inapp-batch
 
-    // Validar que email_content o template exista si se envía email
-    if ((body.type === 'email' || body.type === 'both') && !body.email_content && !body.template_key && !body.template_id) {
-      return NextResponse.json<ApiResponse<null>>({
-        data: null,
-        error: 'Se requiere email_content o un template para enviar emails'
-      }, { status: 400 })
-    }
+    // NOTA: Ya no validamos email_content aquí porque este endpoint solo calcula audiencia.
+    // La validación de email_content se hace en el endpoint send-email-batch
 
     if (!body.audience || !body.audience.type) {
       return NextResponse.json<ApiResponse<null>>({
@@ -78,11 +68,14 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Ejecutar broadcast
-    const result = await NotificationBroadcastService.sendBroadcast(body)
+    // Solo calcular audiencia (no enviar nada todavía)
+    const count = await NotificationBroadcastService.getAudienceCount(body.audience)
 
-    return NextResponse.json<ApiResponse<BroadcastResponse>>({
-      data: result,
+    return NextResponse.json<ApiResponse<{ count: number; audience: BroadcastAudience }>>({
+      data: {
+        count,
+        audience: body.audience
+      },
       error: null
     })
 
