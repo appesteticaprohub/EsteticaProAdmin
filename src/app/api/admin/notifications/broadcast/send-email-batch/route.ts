@@ -3,6 +3,26 @@ import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 import { sendEmail } from '@/lib/resend'
 import type { ApiResponse, BroadcastAudience } from '@/types/admin'
 
+// Helper para guardar logs de email
+async function logEmailSend(logData: {
+  user_id: string
+  template_key: string
+  email: string
+  status: 'sent' | 'failed' | 'delivered'
+  resend_id?: string | null
+  error_message?: string | null
+}) {
+  try {
+    const supabase = await createServerSupabaseAdminClient()
+    const { error } = await supabase.from('email_logs').insert(logData)
+    if (error) {
+      console.error('❌ Error guardando log de email:', error)
+    }
+  } catch (error) {
+    console.error('❌ Error en logEmailSend:', error)
+  }
+}
+
 interface EmailBatchRequest {
   title: string
   message?: string
@@ -201,7 +221,17 @@ export async function POST(request: NextRequest) {
           html: personalizedContent,
           templateKey: body.template_key || undefined,
           userId: user.id,
-          skipLogging: false
+          skipLogging: true  // ← Cambiado a true, lo guardamos manualmente abajo
+        })
+
+        // Guardar log manualmente en broadcast (siempre, con o sin template)
+        await logEmailSend({
+          user_id: user.id,
+          template_key: body.template_key || 'broadcast_manual',
+          email: user.email,
+          status: result.success ? 'sent' : 'failed',
+          resend_id: result.success && result.data?.data?.id ? result.data.data.id : null,
+          error_message: result.success ? null : (result.error || 'Error desconocido')
         })
 
         // Verificar si Resend realmente envió el email
