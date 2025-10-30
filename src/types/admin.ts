@@ -631,3 +631,23 @@ export interface PostImage {
   created_at?: string
 }
 
+// ============================================
+// TIPOS PARA SISTEMA DE GESTIÓN DE PRECIOS Y PAYPAL
+// ============================================
+
+export interface PayPalError {
+  email: string
+  paypal_subscription_id: string
+  error: string
+}
+
+export interface PayPalBatchUpdateResponse {
+  success: boolean
+  updated: number
+  failed: number
+  total: number
+  nextOffset: number
+  hasMore: boolean
+  errors?: PayPalError[]
+}
+

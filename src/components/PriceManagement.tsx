@@ -313,7 +313,7 @@ export default function PriceManagement() {
                 `Progreso: ${paypalUpdatedCount + (result.updated || 0)} / ${result.total || totalPaypalSubscriptions}`;
           
           if (result.errors && result.errors.length > 0) {
-            message += `\n\nErrores:\n${result.errors.slice(0, 3).map((e: any) => `- ${e.email}: ${e.error}`).join('\n')}`;
+            message += `\n\nErrores:\n${result.errors.slice(0, 3).map((e: { email: string; error: string }) => `- ${e.email}: ${e.error}`).join('\n')}`;
             if (result.errors.length > 3) {
               message += `\n... y ${result.errors.length - 3} más`;
             }
@@ -326,7 +326,7 @@ export default function PriceManagement() {
                 `Total fallidas: ${paypalFailedCount + (result.failed || 0)}`;
           
           if (result.errors && result.errors.length > 0) {
-            message += `\n\nErrores:\n${result.errors.slice(0, 5).map((e: any) => `- ${e.email}: ${e.error}`).join('\n')}`;
+            message += `\n\nErrores:\n${result.errors.slice(0, 5).map((e: { email: string; error: string }) => `- ${e.email}: ${e.error}`).join('\n')}`;
           }
           
           alert(message);
