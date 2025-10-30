@@ -182,7 +182,6 @@ export default function NotificationLogs() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'sent': return 'bg-green-100 text-green-800'
-      case 'delivered': return 'bg-blue-100 text-blue-800'
       case 'failed': return 'bg-red-100 text-red-800'
       default: return 'bg-gray-100 text-gray-800'
     }
@@ -191,7 +190,6 @@ export default function NotificationLogs() {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'sent': return 'Enviado'
-      case 'delivered': return 'Entregado'
       case 'failed': return 'Fallido'
       default: return status
     }
@@ -199,8 +197,7 @@ export default function NotificationLogs() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'sent': return '📧'
-      case 'delivered': return '✅'
+      case 'sent': return '✅'
       case 'failed': return '❌'
       default: return '⏳'
     }
@@ -318,7 +315,6 @@ export default function NotificationLogs() {
               >
                 <option value="">Todos</option>
                 <option value="sent">Enviado</option>
-                <option value="delivered">Entregado</option>
                 <option value="failed">Fallido</option>
               </select>
             </div>
@@ -511,7 +507,7 @@ export default function NotificationLogs() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="text-center">
               <p className="text-2xl font-bold text-green-600">
-                {logs.filter(log => log.status === 'sent' || log.status === 'delivered').length}
+                {logs.filter(log => log.status === 'sent').length}
               </p>
               <p className="text-sm text-gray-600">Exitosos</p>
             </div>
