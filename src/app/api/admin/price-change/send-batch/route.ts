@@ -227,8 +227,8 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        // Pausa breve entre envíos (100ms)
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Pausa entre envíos para respetar rate limit de Resend (600ms = ~1.6 emails/segundo)
+        await new Promise(resolve => setTimeout(resolve, 600));
 
       } catch (error) {
         console.error(`❌ Error inesperado enviando a usuario ${user.id}:`, error);
