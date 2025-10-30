@@ -33,7 +33,7 @@ interface Template {
 interface LogsFilters {
   status?: string
   template_key?: string
-  email?: string
+  user_email?: string
   start_date?: string
   end_date?: string
   limit?: number
@@ -347,9 +347,9 @@ export default function NotificationLogs() {
               </label>
               <input
                 type="email"
-                value={filters.email || ''}
+                value={filters.user_email || ''}
                 onChange={(e) => {
-                  const newFilters = { ...filters, email: e.target.value || undefined, offset: 0 }
+                  const newFilters = { ...filters, user_email: e.target.value || undefined, offset: 0 }
                   setFilters(newFilters)
                   fetchLogsWithFilters(newFilters)
                 }}
