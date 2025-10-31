@@ -1,11 +1,29 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Profile, UsersListResponse, UsersFilters } from '@/types/admin'
+
+// Hook personalizado para debounce
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [value, delay])
+
+  return debouncedValue
+}
 
 export default function UserManagement() {
   const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
+  const [searching, setSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
   // Estados de paginación
@@ -15,17 +33,73 @@ export default function UserManagement() {
   const [limit, setLimit] = useState(25)
   
   // Estados de filtros
-  const [searchName, setSearchName] = useState('')
-  const [searchEmail, setSearchEmail] = useState('')
+  // Estados de búsqueda inmediata (lo que escribe el usuario)
+const [searchNameInput, setSearchNameInput] = useState('')
+const [searchEmailInput, setSearchEmailInput] = useState('')
+  
+// Estados de búsqueda con debounce (lo que realmente se envía al servidor)
+const debouncedSearchName = useDebounce(searchNameInput, 500)
+const debouncedSearchEmail = useDebounce(searchEmailInput, 500)
   const [filters, setFilters] = useState<UsersFilters>({})
 
   // Estado del modal
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null)
   const [showModal, setShowModal] = useState(false)
+  // Ref para cancelar peticiones anteriores
+const abortControllerRef = useRef<AbortController | null>(null)
 
-  // Función para obtener usuarios
+const cacheRef = useRef<Map<string, {
+  users: Profile[]
+  totalPages: number
+  totalRecords: number
+  timestamp: number
+}>>(new Map())
+
+// Generar clave única para el caché basada en los parámetros de búsqueda
+const getCacheKey = useCallback(() => {
+  const filterEntries = Object.entries(filters)
+    .filter((entry): entry is [string, string] => {
+      const [_, value] = entry
+      return typeof value === 'string' && value.length > 0
+    })
+    .map(([key, value]) => `${key}:${value}`)
+    .join(',')
+  
+  const params = {
+    page: currentPage,
+    limit,
+    searchName: debouncedSearchName.trim(),
+    searchEmail: debouncedSearchEmail.trim(),
+    filters: filterEntries
+  }
+  return JSON.stringify(params)
+}, [currentPage, limit, debouncedSearchName, debouncedSearchEmail, filters])
+
   const fetchUsers = useCallback(async () => {
     try {
+      const cacheKey = getCacheKey()
+      
+      // Verificar si tenemos datos en caché (válidos por 5 minutos)
+      const cachedData = cacheRef.current.get(cacheKey)
+      const CACHE_DURATION = 5 * 60 * 1000 // 5 minutos
+      
+      if (cachedData && (Date.now() - cachedData.timestamp) < CACHE_DURATION) {
+        console.log('📦 Cargando desde caché')
+        setUsers(cachedData.users)
+        setTotalPages(cachedData.totalPages)
+        setTotalRecords(cachedData.totalRecords)
+        setLoading(false)
+        return
+      }
+
+      // Cancelar petición anterior si existe
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+
+      // Crear nuevo AbortController para esta petición
+      abortControllerRef.current = new AbortController()
+
       setLoading(true)
       setError(null)
 
@@ -35,15 +109,19 @@ export default function UserManagement() {
         limit: limit.toString(),
       })
 
-      if (searchName.trim()) params.append('search_name', searchName.trim())
-      if (searchEmail.trim()) params.append('search_email', searchEmail.trim())
+      if (debouncedSearchName.trim()) params.append('search_name', debouncedSearchName.trim())
+      if (debouncedSearchEmail.trim()) params.append('search_email', debouncedSearchEmail.trim())
 
       // Agregar filtros adicionales si existen
       Object.entries(filters).forEach(([key, value]) => {
         if (value) params.append(key, value)
       })
 
-      const response = await fetch(`/api/admin/users?${params.toString()}`)
+      console.log('🌐 Cargando desde servidor')
+      const response = await fetch(`/api/admin/users?${params.toString()}`, {
+        signal: abortControllerRef.current.signal
+      })
+      
       const result: UsersListResponse = await response.json()
 
       if (!response.ok) {
@@ -54,39 +132,80 @@ export default function UserManagement() {
         setUsers(result.users)
         setTotalPages(result.pagination.total_pages)
         setTotalRecords(result.pagination.total_records)
+        
+        // Guardar en caché
+        cacheRef.current.set(cacheKey, {
+          users: result.users,
+          totalPages: result.pagination.total_pages,
+          totalRecords: result.pagination.total_records,
+          timestamp: Date.now()
+        })
+        
+        // Limitar el tamaño del caché a 50 entradas
+        if (cacheRef.current.size > 50) {
+          const iterator = cacheRef.current.keys()
+          const firstKey = iterator.next().value
+          if (firstKey) {
+            cacheRef.current.delete(firstKey)
+          }
+        }
       } else {
         throw new Error(result.error || 'Error desconocido')
       }
     } catch (err) {
+      // Ignorar errores de cancelación
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('Petición cancelada correctamente')
+        return
+      }
+      
       setError(err instanceof Error ? err.message : 'Error al cargar los datos')
       setUsers([])
     } finally {
       setLoading(false)
     }
-  }, [currentPage, limit, searchName, searchEmail, filters])
+  }, [currentPage, limit, debouncedSearchName, debouncedSearchEmail, filters, getCacheKey])
 
   // Efecto para cargar usuarios
   useEffect(() => {
     fetchUsers()
   }, [fetchUsers])
 
+  // Limpiar AbortController al desmontar
+useEffect(() => {
+  return () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+  }
+}, [])
+
+// Indicador de búsqueda activa
+useEffect(() => {
+  if (searchNameInput !== debouncedSearchName || searchEmailInput !== debouncedSearchEmail) {
+    setSearching(true)
+  } else {
+    setSearching(false)
+  }
+}, [searchNameInput, searchEmailInput, debouncedSearchName, debouncedSearchEmail])
+
   // Handlers
   const handleSearchNameChange = (value: string) => {
-    setSearchName(value)
-    setCurrentPage(1)
-  }
+  setSearchNameInput(value)
+  setCurrentPage(1)
+}
 
-  const handleSearchEmailChange = (value: string) => {
-    setSearchEmail(value)
-    setCurrentPage(1)
-  }
+const handleSearchEmailChange = (value: string) => {
+  setSearchEmailInput(value)
+  setCurrentPage(1)
+}
 
   const handleClearFilters = () => {
-    setSearchName('')
-    setSearchEmail('')
-    setFilters({})
-    setCurrentPage(1)
-  }
+  setSearchNameInput('')
+  setSearchEmailInput('')
+  setFilters({})
+  setCurrentPage(1)
+}
 
   const handleLimitChange = (newLimit: number) => {
     setLimit(newLimit)
@@ -97,6 +216,12 @@ export default function UserManagement() {
     setSelectedUser(user)
     setShowModal(true)
   }
+
+  // Función para invalidar caché (útil después de banear/actualizar usuarios)
+const invalidateCache = useCallback(() => {
+  console.log('🗑️ Limpiando caché')
+  cacheRef.current.clear()
+}, [])
 
   const handleCloseModal = () => {
     setShowModal(false)
@@ -198,13 +323,20 @@ export default function UserManagement() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Buscar por nombre
             </label>
+            <div className="relative">
             <input
               type="text"
-              value={searchName}
+              value={searchNameInput}
               onChange={(e) => handleSearchNameChange(e.target.value)}
               placeholder="Buscar por nombre..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {searching && searchNameInput && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+              </div>
+            )}
+          </div>
           </div>
 
           {/* Búsqueda por email */}
@@ -212,13 +344,20 @@ export default function UserManagement() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Buscar por correo electrónico
             </label>
+            <div className="relative">
             <input
               type="text"
-              value={searchEmail}
+              value={searchEmailInput}
               onChange={(e) => handleSearchEmailChange(e.target.value)}
               placeholder="Buscar por email..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {searching && searchEmailInput && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+              </div>
+            )}
+          </div>
           </div>
 
           {/* Botón limpiar filtros */}
