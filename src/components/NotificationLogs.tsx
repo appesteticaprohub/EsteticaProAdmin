@@ -37,15 +37,15 @@ interface LogsFilters {
   date_from?: string
   date_to?: string
   limit?: number
-  offset?: number
+  page?: number
 }
 
 export default function NotificationLogs() {
   const [logs, setLogs] = useState<EmailLog[]>([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState<LogsFilters>({
-    limit: 20,
-    offset: 0
+    limit: 50,
+    page: 1
   })
   const [totalLogs, setTotalLogs] = useState(0)
   const [hasMore, setHasMore] = useState(false)
@@ -84,10 +84,15 @@ export default function NotificationLogs() {
           }))
         ]
         
-        if (currentFilters.offset === 0) {
+        if (currentFilters.page === 1) {
           setLogs(combinedLogs)
         } else {
-          setLogs(prev => [...prev, ...combinedLogs])
+          // Evitar duplicados al agregar nuevos logs
+          setLogs(prev => {
+            const existingIds = new Set(prev.map(log => log.id))
+            const newLogs = combinedLogs.filter(log => !existingIds.has(log.id))
+            return [...prev, ...newLogs]
+          })
         }
         
         setTotalLogs(data.pagination?.total_records || combinedLogs.length)
@@ -120,20 +125,20 @@ export default function NotificationLogs() {
   }
 
   const loadMore = () => {
-    const newFilters = { ...filters, offset: logs.length }
+    const newFilters = { ...filters, page: (filters.page || 1) + 1 }
     setFilters(newFilters)
     fetchLogsWithFilters(newFilters)
   }
 
   const clearFilters = () => {
     setFilters({
-      limit: 20,
-      offset: 0
+      limit: 50,
+      page: 1
     })
     setLogs([])
     fetchLogsWithFilters({
-      limit: 20,
-      offset: 0
+      limit: 50,
+      page: 1
     })
   }
 
@@ -262,8 +267,8 @@ export default function NotificationLogs() {
   return (
     <div className="px-4 py-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Logs de Notificaciones</h2>
-        <p className="text-gray-600 mt-1">Historial completo de emails y notificaciones enviadas</p>
+        <h2 className="text-2xl font-bold text-gray-900">Logs de Emails</h2>
+        <p className="text-gray-600 mt-1">Historial completo de emails enviados por el sistema</p>
       </div>
 
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6">
@@ -307,7 +312,7 @@ export default function NotificationLogs() {
               <select
                 value={filters.status || ''}
                 onChange={(e) => {
-                  const newFilters = { ...filters, status: e.target.value || undefined, offset: 0 }
+                  const newFilters = { ...filters, status: e.target.value || undefined, page: 1 }
                   setFilters(newFilters)
                   fetchLogsWithFilters(newFilters)
                 }}
@@ -326,7 +331,7 @@ export default function NotificationLogs() {
               <select
                 value={filters.template_key || ''}
                 onChange={(e) => {
-                  const newFilters = { ...filters, template_key: e.target.value || undefined, offset: 0 }
+                  const newFilters = { ...filters, template_key: e.target.value || undefined, page: 1 }
                   setFilters(newFilters)
                   fetchLogsWithFilters(newFilters)
                 }}
@@ -349,7 +354,7 @@ export default function NotificationLogs() {
                 type="email"
                 value={filters.user_email || ''}
                 onChange={(e) => {
-                  const newFilters = { ...filters, user_email: e.target.value || undefined, offset: 0 }
+                  const newFilters = { ...filters, user_email: e.target.value || undefined, page: 1 }
                   setFilters(newFilters)
                   fetchLogsWithFilters(newFilters)
                 }}
@@ -366,7 +371,7 @@ export default function NotificationLogs() {
                 type="date"
                 value={filters.date_from || ''}
                 onChange={(e) => {
-                  const newFilters = { ...filters, date_from: e.target.value || undefined, offset: 0 }
+                  const newFilters = { ...filters, date_from: e.target.value || undefined, page: 1 }
                   setFilters(newFilters)
                   fetchLogsWithFilters(newFilters)
                 }}
@@ -382,7 +387,7 @@ export default function NotificationLogs() {
                 type="date"
                 value={filters.date_to || ''}
                 onChange={(e) => {
-                  const newFilters = { ...filters, date_to: e.target.value || undefined, offset: 0 }
+                  const newFilters = { ...filters, date_to: e.target.value || undefined, page: 1 }
                   setFilters(newFilters)
                   fetchLogsWithFilters(newFilters)
                 }}
@@ -393,7 +398,18 @@ export default function NotificationLogs() {
         )}
 
         <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
-          <span>Mostrando {logs?.length || 0} de {totalLogs} registros</span>
+          <div className="flex items-center space-x-2">
+            <span>Mostrando {logs?.length || 0} de {totalLogs} registros</span>
+            {loading && (
+              <span className="inline-flex items-center text-blue-600">
+                <svg className="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Cargando...
+              </span>
+            )}
+          </div>
           {selectedLogs.length > 0 && (
             <span className="text-blue-600 font-medium">
               {selectedLogs.length} seleccionados
@@ -497,9 +513,15 @@ export default function NotificationLogs() {
                 <button
                   onClick={loadMore}
                   disabled={loading}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors inline-flex items-center space-x-2"
                 >
-                  {loading ? 'Cargando...' : 'Cargar Más'}
+                  {loading && (
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                  <span>{loading ? 'Cargando...' : `Cargar Más (${totalLogs - logs.length} restantes)`}</span>
                 </button>
               </div>
             )}
@@ -508,7 +530,7 @@ export default function NotificationLogs() {
           <div className="p-8 text-center">
             <div className="text-4xl mb-4">📋</div>
             <p className="text-gray-500">
-              {Object.keys(filters).some(key => key !== 'limit' && key !== 'offset' && filters[key as keyof LogsFilters] !== undefined && filters[key as keyof LogsFilters] !== '')
+              {Object.keys(filters).some(key => key !== 'limit' && key !== 'page' && filters[key as keyof LogsFilters] !== undefined && filters[key as keyof LogsFilters] !== '')
                 ? 'No se encontraron logs con los filtros aplicados'
                 : 'No hay logs disponibles'
               }

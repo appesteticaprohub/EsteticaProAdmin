@@ -14,11 +14,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     
     // Parsear filtros de la query string
-    const typeParam = searchParams.get('type') || 'all'
     const statusParam = searchParams.get('status')
     
     const filters: LogsFilters = {
-      type: typeParam as 'email' | 'notification' | 'all',
+      type: 'email', // Siempre email
       status: statusParam ? statusParam as 'sent' | 'failed' | 'delivered' : undefined,
       user_email: searchParams.get('user_email') || undefined,
       template_key: searchParams.get('template_key') || undefined,
@@ -35,146 +34,112 @@ export async function GET(request: NextRequest) {
     const supabase = await createServerSupabaseAdminClient()
     const offset = (filters.page! - 1) * filters.limit!
 
-    // Obtener email logs
-    let emailLogs: EmailLog[] = []
-    let emailCount = 0
-    
-    if (filters.type === 'email' || filters.type === 'all') {
-      let emailQuery = supabase
-        .from('email_logs')
-        .select('*')
-
-      // Aplicar filtros de email
-      if (filters.status) {
-        emailQuery = emailQuery.eq('status', filters.status)
-      }
-      if (filters.user_email) {
-        emailQuery = emailQuery.ilike('email', `%${filters.user_email}%`)
-      }
-      if (filters.template_key) {
-        emailQuery = emailQuery.eq('template_key', filters.template_key)
-      }
-      if (filters.date_from) {
-        emailQuery = emailQuery.gte('sent_at', filters.date_from)
-      }
-      if (filters.date_to) {
-        // Agregar 23:59:59 al final del día para incluir todo el día
-        const dateToEndOfDay = `${filters.date_to}T23:59:59.999Z`
-        emailQuery = emailQuery.lte('sent_at', dateToEndOfDay)
-      }
-
-      // Obtener datos con paginación
-      const { data: emailData, error: emailError, count } = await emailQuery
-        .order('sent_at', { ascending: false })
-        .range(offset, offset + filters.limit! - 1)
-
-      if (emailError) {
-        throw new Error(`Error obteniendo email logs: ${emailError.message}`)
-      }
-
-      // Obtener datos de usuarios para email logs
-      const userIds = [...new Set(emailData?.map((log: EmailLog) => log.user_id) || [])]
-      const { data: users } = await supabase
-        .from('profiles')
-        .select('id, full_name, subscription_status')
-        .in('id', userIds)
-
-      const userMap = new Map(users?.map((user: UserProfile) => [user.id, user]) || [])
-
-      emailLogs = emailData?.map((log: EmailLog) => {
-        const userProfile = userMap.get(log.user_id)
-        return {
-          ...log,
-          user: userProfile ? {
-            full_name: userProfile.full_name,
-            subscription_status: userProfile.subscription_status || 'unknown'
-          } : undefined
-        }
-      }) || []
-
-      emailCount = count || 0
-    }
-
-    // Obtener notificaciones
-    let notifications: Notification[] = []
-    let notificationCount = 0
-
-    if (filters.type === 'notification' || filters.type === 'all') {
-      let notificationQuery = supabase
-        .from('notifications')
-        .select('*')
-
-      // Aplicar filtros de fecha
-      if (filters.date_from) {
-        notificationQuery = notificationQuery.gte('created_at', filters.date_from)
-      }
-      if (filters.date_to) {
-        // Agregar 23:59:59 al final del día para incluir todo el día
-        const dateToEndOfDay = `${filters.date_to}T23:59:59.999Z`
-        notificationQuery = notificationQuery.lte('created_at', dateToEndOfDay)
-      }
-
-      const { data: notificationData, error: notificationError, count } = await notificationQuery
-        .order('created_at', { ascending: false })
-        .range(offset, offset + filters.limit! - 1)
-
-      if (notificationError) {
-        throw new Error(`Error obteniendo notificaciones: ${notificationError.message}`)
-      }
-
-      // Obtener datos de usuarios para notificaciones
-      const userIds = [...new Set(notificationData?.map((notif: Notification) => notif.user_id) || [])]
-      const { data: users } = await supabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .in('id', userIds)
-
-      const userMap = new Map(users?.map((user: UserProfile) => [user.id, user]) || [])
-
-      notifications = notificationData?.map((notif: Notification) => {
-        const userProfile = userMap.get(notif.user_id)
-        return {
-          ...notif,
-          user: userProfile ? {
-            full_name: userProfile.full_name,
-            email: userProfile.email || ''
-          } : undefined
-        }
-      }) || []
-
-      // Filtrar por email si se especifica
-      if (filters.user_email) {
-        notifications = notifications.filter(notif => 
-          notif.user?.email?.toLowerCase().includes(filters.user_email!.toLowerCase())
-        )
-      }
-
-      notificationCount = count || 0
-    }
-
-    // Calcular estadísticas resumidas
-    const { data: emailStats } = await supabase
+    // Construir query para email logs
+    let emailQuery = supabase
       .from('email_logs')
-      .select('status')
+      .select('*')
 
-    const { data: notificationStats } = await supabase
-      .from('notifications')
-      .select('id')
+    // Aplicar filtros de email
+    if (filters.status) {
+      emailQuery = emailQuery.eq('status', filters.status)
+    }
+    if (filters.user_email) {
+      emailQuery = emailQuery.ilike('email', `%${filters.user_email}%`)
+    }
+    if (filters.template_key) {
+      emailQuery = emailQuery.eq('template_key', filters.template_key)
+    }
+    if (filters.date_from) {
+      emailQuery = emailQuery.gte('sent_at', filters.date_from)
+    }
+    if (filters.date_to) {
+      // Agregar 23:59:59 al final del día para incluir todo el día
+      const dateToEndOfDay = `${filters.date_to}T23:59:59.999Z`
+      emailQuery = emailQuery.lte('sent_at', dateToEndOfDay)
+    }
 
-    const totalEmails = emailStats?.length || 0
-    const successfulEmails = emailStats?.filter((log: { status: string }) => log.status === 'sent').length || 0
-    const failedEmails = emailStats?.filter((log: { status: string }) => log.status === 'failed').length || 0
+    // Primero obtener el conteo total con los filtros aplicados
+    let countQuery = supabase
+      .from('email_logs')
+      .select('*', { count: 'exact', head: true })
+    
+    // Aplicar los mismos filtros que a la consulta de datos
+    if (filters.status) {
+      countQuery = countQuery.eq('status', filters.status)
+    }
+    if (filters.user_email) {
+      countQuery = countQuery.ilike('email', `%${filters.user_email}%`)
+    }
+    if (filters.template_key) {
+      countQuery = countQuery.eq('template_key', filters.template_key)
+    }
+    if (filters.date_from) {
+      countQuery = countQuery.gte('sent_at', filters.date_from)
+    }
+    if (filters.date_to) {
+      const dateToEndOfDay = `${filters.date_to}T23:59:59.999Z`
+      countQuery = countQuery.lte('sent_at', dateToEndOfDay)
+    }
+    
+    const { count } = await countQuery
+    const emailCount = count || 0
+
+    // Ahora obtener los datos con paginación
+    const { data: emailData, error: emailError } = await emailQuery
+      .order('sent_at', { ascending: false })
+      .range(offset, offset + filters.limit! - 1)
+
+    if (emailError) {
+      throw new Error(`Error obteniendo email logs: ${emailError.message}`)
+    }
+
+    // Obtener datos de usuarios para email logs
+    const userIds = [...new Set(emailData?.map((log: EmailLog) => log.user_id) || [])]
+    const { data: users } = await supabase
+      .from('profiles')
+      .select('id, full_name, subscription_status')
+      .in('id', userIds)
+
+    const userMap = new Map(users?.map((user: UserProfile) => [user.id, user]) || [])
+
+    const emailLogs = emailData?.map((log: EmailLog) => {
+      const userProfile = userMap.get(log.user_id)
+      return {
+        ...log,
+        user: userProfile ? {
+          full_name: userProfile.full_name,
+          subscription_status: userProfile.subscription_status || 'unknown'
+        } : undefined
+      }
+    }) || []
+
+    // Calcular estadísticas resumidas de forma optimizada
+    const { count: totalEmailsCount } = await supabase
+      .from('email_logs')
+      .select('id', { count: 'exact', head: true })
+
+    const { count: successfulEmailsCount } = await supabase
+      .from('email_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'sent')
+
+    const { count: failedEmailsCount } = await supabase
+      .from('email_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'failed')
+
+    const totalEmails = totalEmailsCount || 0
+    const successfulEmails = successfulEmailsCount || 0
+    const failedEmails = failedEmailsCount || 0
 
     // Calcular paginación
-    const totalRecords = filters.type === 'all' ? emailCount + notificationCount : 
-                        filters.type === 'email' ? emailCount : notificationCount
-    const totalPages = Math.ceil(totalRecords / filters.limit!)
+    const totalPages = Math.ceil(emailCount / filters.limit!)
 
     const response: LogsResponse = {
       email_logs: emailLogs,
-      notifications: notifications,
+      notifications: [], // Vacío - ya no se usan
       pagination: {
-        total_records: totalRecords,
+        total_records: emailCount,
         total_pages: totalPages,
         current_page: filters.page!,
         has_next: filters.page! < totalPages,
@@ -184,7 +149,7 @@ export async function GET(request: NextRequest) {
         total_emails: totalEmails,
         successful_emails: successfulEmails,
         failed_emails: failedEmails,
-        total_notifications: notificationStats?.length || 0
+        total_notifications: 0
       }
     }
 
