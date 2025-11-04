@@ -2,7 +2,39 @@ import { NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 import { createServerSupabaseClient } from '@/lib/server-supabase'
 
+// ========== SISTEMA DE CACHÉ ==========
+interface StatsCache {
+  data: any | null
+  timestamp: number
+}
 
+const statsCache: StatsCache = {
+  data: null,
+  timestamp: 0
+}
+
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutos en milisegundos
+
+function isCacheValid(): boolean {
+  const now = Date.now()
+  return statsCache.data !== null && (now - statsCache.timestamp) < CACHE_DURATION
+}
+
+function getCachedStats() {
+  return statsCache.data
+}
+
+function setCacheStats(data: any) {
+  statsCache.data = data
+  statsCache.timestamp = Date.now()
+}
+
+function clearCache() {
+  statsCache.data = null
+  statsCache.timestamp = 0
+}
+
+// ========== ENDPOINT ==========
 export async function GET() {
   try {
     // Verificar que el usuario autenticado es admin
@@ -29,6 +61,18 @@ export async function GET() {
       )
     }
 
+    // ========== VERIFICAR CACHÉ ==========
+    if (isCacheValid()) {
+      const cachedData = getCachedStats()
+      return NextResponse.json({
+        success: true,
+        data: cachedData.stats,
+        cached: true,
+        cache_expires_in: Math.round((CACHE_DURATION - (Date.now() - statsCache.timestamp)) / 1000) // segundos restantes
+      })
+    }
+
+    // ========== SI NO HAY CACHÉ VÁLIDO, EJECUTAR QUERIES ==========
     const supabase = createServerSupabaseAdminClient()
 
     // Obtener fechas para filtros temporales
@@ -37,150 +81,99 @@ export async function GET() {
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
     const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
-    // ========== POSTS ==========
-    const { count: totalPosts } = await supabase
-      .from('posts')
-      .select('*', { count: 'exact', head: true })
-
-    const { count: postsToday } = await supabase
-      .from('posts')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', today)
-
-    const { count: postsThisWeek } = await supabase
-      .from('posts')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', weekAgo)
-
-    const { count: postsThisMonth } = await supabase
-      .from('posts')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', monthAgo)
-
-    const { count: pendingReview } = await supabase
-      .from('posts')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_reviewed', false)
-
-    // Posts eliminados (mediante logs)
-    const { count: deletedPostsToday } = await supabase
-      .from('moderation_logs')
-      .select('*', { count: 'exact', head: true })
-      .eq('action_type', 'delete_post')
-      .gte('created_at', today)
-
-    const { count: deletedPostsWeek } = await supabase
-      .from('moderation_logs')
-      .select('*', { count: 'exact', head: true })
-      .eq('action_type', 'delete_post')
-      .gte('created_at', weekAgo)
-
-    const { count: deletedPostsMonth } = await supabase
-      .from('moderation_logs')
-      .select('*', { count: 'exact', head: true })
-      .eq('action_type', 'delete_post')
-      .gte('created_at', monthAgo)
-
-    // ========== COMMENTS ==========
-    const { count: totalComments } = await supabase
-      .from('comments')
-      .select('*', { count: 'exact', head: true })
-
-    const { count: commentsToday } = await supabase
-      .from('comments')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', today)
-
-    const { count: commentsThisWeek } = await supabase
-      .from('comments')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', weekAgo)
-
-    const { count: commentsThisMonth } = await supabase
-      .from('comments')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', monthAgo)
-
-    const { count: deletedCommentsToday } = await supabase
-      .from('comments')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_deleted', true)
-      .gte('deleted_at', today)
-
-    const { count: deletedCommentsWeek } = await supabase
-      .from('comments')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_deleted', true)
-      .gte('deleted_at', weekAgo)
-
-    const { count: deletedCommentsMonth } = await supabase
-      .from('comments')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_deleted', true)
-      .gte('deleted_at', monthAgo)
-
-    // ========== USERS ==========
-    const { count: totalActiveUsers } = await supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_banned', false)
-
-    const { count: totalBannedUsers } = await supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_banned', true)
-
-    const { count: bannedToday } = await supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_banned', true)
-      .gte('banned_at', today)
-
-    const { count: bannedWeek } = await supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_banned', true)
-      .gte('banned_at', weekAgo)
-
-    const { count: bannedMonth } = await supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_banned', true)
-      .gte('banned_at', monthAgo)
+    // Ejecutar queries en paralelo para mejor performance
+    const [
+      // POSTS
+      totalPostsResult,
+      postsTodayResult,
+      postsThisWeekResult,
+      postsThisMonthResult,
+      pendingReviewResult,
+      deletedPostsTodayResult,
+      deletedPostsWeekResult,
+      deletedPostsMonthResult,
+      
+      // COMMENTS
+      totalCommentsResult,
+      commentsTodayResult,
+      commentsThisWeekResult,
+      commentsThisMonthResult,
+      deletedCommentsTodayResult,
+      deletedCommentsWeekResult,
+      deletedCommentsMonthResult,
+      
+      // USERS
+      totalActiveUsersResult,
+      totalBannedUsersResult,
+      bannedTodayResult,
+      bannedWeekResult,
+      bannedMonthResult
+    ] = await Promise.all([
+      // ========== POSTS ==========
+      supabase.from('posts').select('*', { count: 'exact', head: true }),
+      supabase.from('posts').select('*', { count: 'exact', head: true }).gte('created_at', today),
+      supabase.from('posts').select('*', { count: 'exact', head: true }).gte('created_at', weekAgo),
+      supabase.from('posts').select('*', { count: 'exact', head: true }).gte('created_at', monthAgo),
+      supabase.from('posts').select('*', { count: 'exact', head: true }).eq('is_reviewed', false),
+      supabase.from('moderation_logs').select('*', { count: 'exact', head: true }).eq('action_type', 'delete_post').gte('created_at', today),
+      supabase.from('moderation_logs').select('*', { count: 'exact', head: true }).eq('action_type', 'delete_post').gte('created_at', weekAgo),
+      supabase.from('moderation_logs').select('*', { count: 'exact', head: true }).eq('action_type', 'delete_post').gte('created_at', monthAgo),
+      
+      // ========== COMMENTS ==========
+      supabase.from('comments').select('*', { count: 'exact', head: true }),
+      supabase.from('comments').select('*', { count: 'exact', head: true }).gte('created_at', today),
+      supabase.from('comments').select('*', { count: 'exact', head: true }).gte('created_at', weekAgo),
+      supabase.from('comments').select('*', { count: 'exact', head: true }).gte('created_at', monthAgo),
+      supabase.from('comments').select('*', { count: 'exact', head: true }).eq('is_deleted', true).gte('deleted_at', today),
+      supabase.from('comments').select('*', { count: 'exact', head: true }).eq('is_deleted', true).gte('deleted_at', weekAgo),
+      supabase.from('comments').select('*', { count: 'exact', head: true }).eq('is_deleted', true).gte('deleted_at', monthAgo),
+      
+      // ========== USERS ==========
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_banned', false),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_banned', true),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_banned', true).gte('banned_at', today),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_banned', true).gte('banned_at', weekAgo),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_banned', true).gte('banned_at', monthAgo)
+    ])
 
     // Construir respuesta
     const stats = {
       posts: {
-        total: totalPosts || 0,
-        today: postsToday || 0,
-        this_week: postsThisWeek || 0,
-        this_month: postsThisMonth || 0,
-        deleted_today: deletedPostsToday || 0,
-        deleted_week: deletedPostsWeek || 0,
-        deleted_month: deletedPostsMonth || 0,
-        pending_review: pendingReview || 0
+        total: totalPostsResult.count || 0,
+        today: postsTodayResult.count || 0,
+        this_week: postsThisWeekResult.count || 0,
+        this_month: postsThisMonthResult.count || 0,
+        deleted_today: deletedPostsTodayResult.count || 0,
+        deleted_week: deletedPostsWeekResult.count || 0,
+        deleted_month: deletedPostsMonthResult.count || 0,
+        pending_review: pendingReviewResult.count || 0
       },
       comments: {
-        total: totalComments || 0,
-        today: commentsToday || 0,
-        this_week: commentsThisWeek || 0,
-        this_month: commentsThisMonth || 0,
-        deleted_today: deletedCommentsToday || 0,
-        deleted_week: deletedCommentsWeek || 0,
-        deleted_month: deletedCommentsMonth || 0
+        total: totalCommentsResult.count || 0,
+        today: commentsTodayResult.count || 0,
+        this_week: commentsThisWeekResult.count || 0,
+        this_month: commentsThisMonthResult.count || 0,
+        deleted_today: deletedCommentsTodayResult.count || 0,
+        deleted_week: deletedCommentsWeekResult.count || 0,
+        deleted_month: deletedCommentsMonthResult.count || 0
       },
       users: {
-        total_active: totalActiveUsers || 0,
-        total_banned: totalBannedUsers || 0,
-        banned_today: bannedToday || 0,
-        banned_week: bannedWeek || 0,
-        banned_month: bannedMonth || 0
+        total_active: totalActiveUsersResult.count || 0,
+        total_banned: totalBannedUsersResult.count || 0,
+        banned_today: bannedTodayResult.count || 0,
+        banned_week: bannedWeekResult.count || 0,
+        banned_month: bannedMonthResult.count || 0
       }
     }
 
+    // ========== GUARDAR EN CACHÉ ==========
+    setCacheStats({ stats })
+
     return NextResponse.json({
       success: true,
-      data: stats
+      data: stats,
+      cached: false,
+      cache_duration: CACHE_DURATION / 1000 // en segundos
     })
 
   } catch (error) {
@@ -190,6 +183,49 @@ export async function GET() {
         success: false, 
         error: error instanceof Error ? error.message : 'Internal server error' 
       },
+      { status: 500 }
+    )
+  }
+}
+
+// ========== ENDPOINT PARA LIMPIAR CACHÉ (OPCIONAL) ==========
+export async function DELETE() {
+  try {
+    // Verificar autenticación admin
+    const supabaseAuth = await createServerSupabaseClient()
+    const { data: { user: adminUser }, error: authError } = await supabaseAuth.auth.getUser()
+
+    if (authError || !adminUser) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    const { data: adminProfile, error: adminError } = await supabaseAuth
+      .from('profiles')
+      .select('role')
+      .eq('id', adminUser.id)
+      .single()
+
+    if (adminError || !adminProfile || adminProfile.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden' },
+        { status: 403 }
+      )
+    }
+
+    clearCache()
+
+    return NextResponse.json({
+      success: true,
+      message: 'Cache cleared successfully'
+    })
+
+  } catch (error) {
+    console.error('Error clearing cache:', error)
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     )
   }

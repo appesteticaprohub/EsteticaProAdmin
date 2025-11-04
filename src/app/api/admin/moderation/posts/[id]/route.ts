@@ -99,7 +99,7 @@ export async function GET(
       .select('*', { count: 'exact', head: true })
       .eq('author_id', post.author_id)
 
-    const { count: totalComments } = await supabase
+    const { count: totalCommentsCount } = await supabase
       .from('comments')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', post.author_id)
@@ -112,11 +112,25 @@ export async function GET(
       .eq('is_deleted', true)
 
     // 4. Obtener comentarios del post con información de usuarios
+    // Obtener parámetros de paginación
+    const searchParams = request.nextUrl.searchParams
+    const commentsPage = parseInt(searchParams.get('comments_page') || '1')
+    const commentsLimit = parseInt(searchParams.get('comments_limit') || '50')
+    const commentsOffset = (commentsPage - 1) * commentsLimit
+
+    // Obtener total de comentarios
+    const { count: totalComments } = await supabase
+      .from('comments')
+      .select('*', { count: 'exact', head: true })
+      .eq('post_id', postId)
+
+    // Obtener comentarios paginados
     const { data: comments } = await supabase
       .from('comments')
       .select('*')
       .eq('post_id', postId)
       .order('created_at', { ascending: true })
+      .range(commentsOffset, commentsOffset + commentsLimit - 1)
 
     // Obtener información de usuarios de los comentarios
     const commentUserIds = (comments as CommentFromDB[] | null)?.map((c) => c.user_id).filter(Boolean) || []
@@ -140,6 +154,8 @@ export async function GET(
       .in('action_type', ['ban_user', 'unban_user'])
       .order('created_at', { ascending: false })
 
+    const totalCommentsPages = Math.ceil((totalComments || 0) / commentsLimit)
+
     const response = {
       success: true,
       data: {
@@ -148,12 +164,19 @@ export async function GET(
           ...author,
           stats: {
             total_posts: totalPosts || 0,
-            total_comments: totalComments || 0,
+            total_comments: totalCommentsCount || 0,
             deleted_comments: deletedComments || 0,
             ban_history: banHistory || []
           }
         },
-        comments: commentsWithUsers
+        comments: commentsWithUsers,
+        comments_pagination: {
+          current_page: commentsPage,
+          total_pages: totalCommentsPages,
+          total_comments: totalComments || 0,
+          comments_per_page: commentsLimit,
+          has_more: commentsPage < totalCommentsPages
+        }
       }
     }
 

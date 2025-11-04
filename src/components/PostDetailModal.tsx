@@ -40,18 +40,51 @@ export default function PostDetailModal({
   const [isEditingCategory, setIsEditingCategory] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('')
 
+  // Estados para paginación de comentarios
+  const [commentsPage, setCommentsPage] = useState(1)
+  const [commentsPagination, setCommentsPagination] = useState({
+    current_page: 1,
+    total_pages: 1,
+    total_comments: 0,
+    comments_per_page: 50,
+    has_more: false
+  })
 
-  const fetchPostDetail = useCallback(async () => {
+
+  const fetchPostDetail = useCallback(async (page: number = 1) => {
     try {
       setLoading(true)
       setError(null)
-      const response = await fetch(`/api/admin/moderation/posts/${postId}`)
+      
+      const params = new URLSearchParams({
+        comments_page: page.toString(),
+        comments_limit: '50'
+      })
+      
+      const response = await fetch(`/api/admin/moderation/posts/${postId}?${params}`)
       const result: PostDetailResponse = await response.json()
 
       if (!result.success || !result.data) {
         setError(result.success === false ? 'Error al cargar el post' : 'Post no encontrado')
       } else {
-        setPostDetail(result.data)
+        // Si es página 1, reemplazar todos los datos
+        if (page === 1) {
+          setPostDetail(result.data)
+        } else {
+          // Si es página > 1, agregar comentarios nuevos
+          setPostDetail(prev => {
+            if (!prev) return result.data
+            return {
+              ...result.data,
+              comments: [...(prev.comments || []), ...(result.data.comments || [])]
+            }
+          })
+        }
+        
+        // Actualizar metadata de paginación
+        if (result.data.comments_pagination) {
+          setCommentsPagination(result.data.comments_pagination)
+        }
       }
     } catch (err) {
       setError('Error al cargar los detalles del post')
@@ -63,7 +96,8 @@ export default function PostDetailModal({
 
   useEffect(() => {
     if (isOpen && postId) {
-      fetchPostDetail()
+      setCommentsPage(1)
+      fetchPostDetail(1)
     }
   }, [isOpen, postId, fetchPostDetail])
 
@@ -224,15 +258,42 @@ export default function PostDetailModal({
     setLightboxOpen(true)
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+  const handleClose = () => {
+  // Limpiar completamente el estado al cerrar
+  setPostDetail(null)
+  setCommentsPage(1)
+  setCommentsPagination({
+    current_page: 1,
+    total_pages: 1,
+    total_comments: 0,
+    comments_per_page: 50,
+    has_more: false
+  })
+  setLightboxOpen(false)
+  setBanModalOpen(false)
+  setCurrentImageIndex(0)
+  setIsEditingCategory(false)
+  setSelectedCategory('')
+  
+  // Llamar al cierre del padre
+  onClose()
+}
+
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('es-ES', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+  const handleLoadMoreComments = async () => {
+    const nextPage = commentsPage + 1
+    setCommentsPage(nextPage)
+    await fetchPostDetail(nextPage)
   }
 
   if (!isOpen) return null
@@ -243,7 +304,7 @@ export default function PostDetailModal({
         {/* Overlay */}
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-          onClick={onClose}
+          onClick={handleClose}
         />
 
         {/* Modal */}
@@ -254,7 +315,7 @@ export default function PostDetailModal({
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-bold">Detalles del Post</h3>
                 <button
-                  onClick={onClose}
+                  onClick={handleClose}
                   className="text-white hover:text-gray-200 text-2xl leading-none"
                   disabled={actionLoading}
                 >
@@ -505,12 +566,17 @@ export default function PostDetailModal({
                   <div className="bg-white border border-gray-200 rounded-lg p-6">
                     <CommentsTreeView
                       comments={postDetail.comments}
+                      pagination={commentsPagination}
+                      onLoadMore={commentsPagination.has_more ? handleLoadMoreComments : undefined}
+                      loadingMore={loading && commentsPage > 1}
                       onCommentDeleted={() => {
-                        fetchPostDetail()
+                        setCommentsPage(1)
+                        fetchPostDetail(1)
                         onPostUpdated?.()
                       }}
                       onUserBanned={() => {
-                        fetchPostDetail()
+                        setCommentsPage(1)
+                        fetchPostDetail(1)
                         onPostUpdated?.()
                       }}
                     />
@@ -564,7 +630,7 @@ export default function PostDetailModal({
                   )}
                 </div>
                 <button
-                  onClick={onClose}
+                  onClick={handleClose}
                   disabled={actionLoading}
                   className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
                 >

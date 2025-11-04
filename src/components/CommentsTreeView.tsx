@@ -1,11 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { CommentWithUser } from '@/types/admin'
 import BanUserModal from './BanUserModal'
 
 interface CommentsTreeViewProps {
   comments: CommentWithUser[]
+  pagination?: {
+    current_page: number
+    total_pages: number
+    total_comments: number
+    comments_per_page: number
+    has_more: boolean
+  }
+  onLoadMore?: () => void
+  loadingMore?: boolean
   onCommentDeleted?: () => void
   onUserBanned?: () => void
 }
@@ -16,6 +25,9 @@ interface CommentNode extends CommentWithUser {
 
 export default function CommentsTreeView({
   comments,
+  pagination,
+  onLoadMore,
+  loadingMore = false,
   onCommentDeleted,
   onUserBanned
 }: CommentsTreeViewProps) {
@@ -70,6 +82,8 @@ export default function CommentsTreeView({
         return comments
     }
   }
+
+
 
   const toggleThread = (commentId: string) => {
     const newCollapsed = new Set(collapsedThreads)
@@ -295,8 +309,15 @@ export default function CommentsTreeView({
     )
   }
 
-  const filteredComments = filterComments(comments)
-  const commentTree = buildCommentTree(filteredComments)
+  const filteredComments = useMemo(
+  () => filterComments(comments),
+  [comments, filter]
+)
+
+const commentTree = useMemo(
+  () => buildCommentTree(filteredComments),
+  [filteredComments]
+)
   
   const stats = {
     total: comments.length,
@@ -309,9 +330,17 @@ export default function CommentsTreeView({
       <div className="space-y-4">
         {/* Header con filtros */}
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Comentarios ({stats.total})
-          </h3>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">
+              Comentarios ({stats.total})
+            </h3>
+            {pagination && (
+              <p className="text-sm text-gray-500 mt-1">
+                Mostrando {comments.length} de {pagination.total_comments} comentarios
+                {pagination.has_more && ` • Página ${pagination.current_page} de ${pagination.total_pages}`}
+              </p>
+            )}
+          </div>
           
           {/* Filtros */}
           <div className="flex items-center gap-2">
@@ -361,6 +390,28 @@ export default function CommentsTreeView({
         ) : (
           <div className="space-y-2">
             {commentTree.map(comment => renderComment(comment))}
+          </div>
+        )}
+
+        {/* Botón para cargar más comentarios */}
+        {pagination && pagination.has_more && onLoadMore && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={onLoadMore}
+              disabled={loadingMore}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
+            >
+              {loadingMore ? (
+                <>
+                  <span className="inline-block animate-spin mr-2">⏳</span>
+                  Cargando comentarios...
+                </>
+              ) : (
+                <>
+                  Cargar más comentarios ({pagination.total_comments - comments.length} restantes)
+                </>
+              )}
+            </button>
           </div>
         )}
       </div>

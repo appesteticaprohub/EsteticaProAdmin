@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
     
     // Parámetros de paginación
     const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100) // Máximo 100 registros
     const offset = (page - 1) * limit
 
     // Parámetros de ordenamiento
@@ -104,11 +104,15 @@ export async function GET(request: NextRequest) {
         .select('id')
 
       if (authorEmail) {
-        authorQuery = authorQuery.ilike('email', `%${authorEmail}%`)
+        // Usar LOWER() para aprovechar índice idx_profiles_email_lower
+        const emailLower = authorEmail.toLowerCase().trim()
+        authorQuery = authorQuery.ilike('email', `%${emailLower}%`)
       }
 
       if (authorName) {
-        authorQuery = authorQuery.ilike('full_name', `%${authorName}%`)
+        // Usar LOWER() para aprovechar índice idx_profiles_name_lower
+        const nameLower = authorName.toLowerCase().trim()
+        authorQuery = authorQuery.ilike('full_name', `%${nameLower}%`)
       }
 
       if (authorStatus === 'active') {
@@ -175,16 +179,20 @@ export async function GET(request: NextRequest) {
 
     // Aplicar resto de filtros
     if (category) {
-      // Usar ilike para búsqueda case-insensitive y flexible
-      postsQuery = postsQuery.ilike('category', category)
+      // Usar eq para búsqueda exacta (aprovecha índice idx_posts_category)
+      postsQuery = postsQuery.eq('category', category)
     }
 
     if (dateFrom) {
-      postsQuery = postsQuery.gte('created_at', dateFrom)
+      // Agregar hora de inicio del día en zona horaria de Colombia (UTC-5)
+      const dateFromStart = `${dateFrom}T00:00:00-05:00`
+      postsQuery = postsQuery.gte('created_at', dateFromStart)
     }
 
     if (dateTo) {
-      postsQuery = postsQuery.lte('created_at', dateTo)
+      // Agregar hora de fin del día en zona horaria de Colombia (UTC-5)
+      const dateToEnd = `${dateTo}T23:59:59-05:00`
+      postsQuery = postsQuery.lte('created_at', dateToEnd)
     }
 
     if (minComments) {
@@ -203,10 +211,17 @@ export async function GET(request: NextRequest) {
       postsQuery = postsQuery.eq('is_reviewed', false)
     }
 
-    // Ordenamiento
+    // Ordenamiento optimizado (aprovecha índices compuestos)
     const validSortColumns = ['created_at', 'views_count', 'likes_count', 'comments_count', 'title']
     const sortColumn = validSortColumns.includes(sortBy) ? sortBy : 'created_at'
+    
+    // Aplicar ordenamiento principal
     postsQuery = postsQuery.order(sortColumn, { ascending: sortOrder === 'asc' })
+    
+    // Agregar ordenamiento secundario por ID para consistencia
+    if (sortColumn !== 'id') {
+      postsQuery = postsQuery.order('id', { ascending: false })
+    }
 
     // Paginación
     postsQuery = postsQuery.range(offset, offset + limit - 1)
@@ -226,10 +241,17 @@ export async function GET(request: NextRequest) {
     
     let authors: AuthorFullFromDB[] = []
     if (postAuthorIds.length > 0) {
-      const { data: authorsData } = await supabase
+      // Eliminar duplicados antes de consultar
+      const uniqueAuthorIds = [...new Set(postAuthorIds)]
+      
+      const { data: authorsData, error: authorsError } = await supabase
         .from('profiles')
         .select('id, full_name, email, country, specialty, user_type, subscription_status, is_banned, created_at')
-        .in('id', postAuthorIds)
+        .in('id', uniqueAuthorIds)
+      
+      if (authorsError) {
+        console.error('Error fetching authors:', authorsError)
+      }
       
       authors = authorsData || []
     }

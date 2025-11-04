@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
 import { PostsListResponse, PostWithAuthor, PostsFilters, PostsSortOptions } from '@/types/admin'
 import BanUserModal from './BanUserModal'
@@ -53,12 +53,19 @@ export default function ContentModerationPanel() {
     sortOrder: 'desc'
   })
 
+  // Estado para límite de registros por página
+  const [recordsPerPage, setRecordsPerPage] = useState(50)
+
   // Estados de modales
   const [showBanModal, setShowBanModal] = useState(false)
   const [showHistoryModal, setShowHistoryModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<{ id: string; name: string; email: string } | null>(null)
   const [showPostDetailModal, setShowPostDetailModal] = useState(false)
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
+
+  // Estados temporales para inputs (solo para evitar re-renders pesados)
+  const [emailInput, setEmailInput] = useState('')
+  const [nameInput, setNameInput] = useState('')
 
   const fetchPosts = useCallback(async () => {
     try {
@@ -67,7 +74,7 @@ export default function ContentModerationPanel() {
 
       const params = new URLSearchParams({
         page: currentPage.toString(),
-        limit: '20',
+        limit: recordsPerPage.toString(),
         sortBy: sortOptions.sortBy,
         sortOrder: sortOptions.sortOrder
       })
@@ -121,11 +128,18 @@ export default function ContentModerationPanel() {
     } finally {
       setLoading(false)
     }
-  }, [currentPage, sortOptions, activeFilters])
+  }, [currentPage, sortOptions, activeFilters, recordsPerPage])
 
   // Aplicar filtros
   const handleApplyFilters = () => {
-    setActiveFilters(tempFilters)
+    // Sincronizar inputs con filtros activos antes de aplicar
+    const filtersToApply = {
+      ...tempFilters,
+      authorEmail: emailInput,
+      authorName: nameInput
+    }
+    setTempFilters(filtersToApply)
+    setActiveFilters(filtersToApply)
     setCurrentPage(1) // Reset a página 1 al aplicar filtros
   }
 
@@ -143,9 +157,24 @@ export default function ContentModerationPanel() {
       isReviewed: 'all',
       showDeleted: 'true'
     }
+    setEmailInput('')
+    setNameInput('')
     setTempFilters(emptyFilters)
     setActiveFilters(emptyFilters)
     setCurrentPage(1)
+  }
+
+  // Función para ir a página específica
+  const handleGoToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page)
+    }
+  }
+
+  // Función para cambiar registros por página
+  const handleRecordsPerPageChange = (newLimit: number) => {
+    setRecordsPerPage(newLimit)
+    setCurrentPage(1) // Reset a página 1
   }
 
   // Contar filtros activos
@@ -258,8 +287,8 @@ export default function ContentModerationPanel() {
             </label>
             <input
               type="text"
-              value={tempFilters.authorEmail}
-              onChange={(e) => setTempFilters({ ...tempFilters, authorEmail: e.target.value })}
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Buscar por email..."
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -273,8 +302,8 @@ export default function ContentModerationPanel() {
             </label>
             <input
               type="text"
-              value={tempFilters.authorName}
-              onChange={(e) => setTempFilters({ ...tempFilters, authorName: e.target.value })}
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Buscar por nombre..."
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -448,7 +477,7 @@ export default function ContentModerationPanel() {
         <>
           {/* Info de paginación */}
           <div className="text-sm text-gray-600">
-            Mostrando posts {((currentPage - 1) * 20) + 1} al {Math.min(currentPage * 20, totalRecords)} de un total de {totalRecords}
+            Mostrando posts {((currentPage - 1) * recordsPerPage) + 1} al {Math.min(currentPage * recordsPerPage, totalRecords)} de un total de {totalRecords}
           </div>
 
           {/* Grid de posts */}
@@ -574,26 +603,91 @@ export default function ContentModerationPanel() {
             ))}
           </div>
 
-          {/* Paginación */}
+          {/* Paginación Mejorada */}
           {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-4 mt-6">
-              <button
-                onClick={() => setCurrentPage(prev => prev - 1)}
-                disabled={currentPage === 1}
-                className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Anterior
-              </button>
-              <span className="text-gray-700">
-                Página {currentPage} de {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage(prev => prev + 1)}
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Siguiente
-              </button>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                {/* Info de registros y selector */}
+                <div className="flex items-center gap-4">
+                  <div className="text-sm text-gray-600">
+                    Mostrando {((currentPage - 1) * recordsPerPage) + 1} - {Math.min(currentPage * recordsPerPage, totalRecords)} de {totalRecords} registros
+                  </div>
+                  
+                  {/* Selector de registros por página */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-600">Mostrar:</label>
+                    <select
+                      value={recordsPerPage}
+                      onChange={(e) => handleRecordsPerPageChange(Number(e.target.value))}
+                      className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Controles de paginación */}
+                <div className="flex items-center gap-2">
+                  {/* Primera página */}
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    title="Primera página"
+                  >
+                    «
+                  </button>
+
+                  {/* Anterior */}
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    Anterior
+                  </button>
+
+                  {/* Ir a página específica */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Página</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={totalPages}
+                      value={currentPage}
+                      onChange={(e) => {
+                        const page = parseInt(e.target.value)
+                        if (!isNaN(page)) {
+                          handleGoToPage(page)
+                        }
+                      }}
+                      className="w-16 px-2 py-1 border border-gray-300 rounded-lg text-center text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <span className="text-sm text-gray-600">de {totalPages}</span>
+                  </div>
+
+                  {/* Siguiente */}
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    Siguiente
+                  </button>
+
+                  {/* Última página */}
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    title="Última página"
+                  >
+                    »
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </>

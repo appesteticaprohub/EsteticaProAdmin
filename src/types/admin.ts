@@ -463,12 +463,21 @@ export interface PostDetailData {
   deleted_at: string | null
 }
 
+export interface CommentsPagination {
+  current_page: number
+  total_pages: number
+  total_comments: number
+  comments_per_page: number
+  has_more: boolean
+}
+
 export interface PostDetailResponse {
   success: boolean
   data: {
     post: PostDetailData
     author: PostDetailAuthor
     comments: CommentWithUser[]
+    comments_pagination?: CommentsPagination 
   }
 }
 
