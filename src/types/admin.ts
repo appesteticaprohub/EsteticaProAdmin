@@ -226,24 +226,6 @@ export interface ImageSettings {
   max_height: number
 }
 
-export interface StorageStats {
-  total_images: number
-  storage_used_mb: number
-  storage_used_gb: number
-  images_this_month: number
-  images_this_week: number
-  average_images_per_post: number
-  top_uploaders: Array<{
-    user_id: string
-    user_name: string
-    image_count: number
-  }>
-  monthly_trend: Array<{
-    month: string
-    count: number
-  }>
-}
-
 // Tipos para sistema de moderación y baneo
 export interface BanUserRequest {
   reason: string

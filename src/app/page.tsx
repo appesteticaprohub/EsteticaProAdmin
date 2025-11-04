@@ -12,7 +12,6 @@ import TemplateManager from '@/components/TemplateManager'
 import NotificationLogs from '@/components/NotificationLogs'
 import NotificationCleanup from '@/components/NotificationCleanup'
 import ImageSettingsPanel from '@/components/ImageSettingsPanel'
-import StorageStatsPanel from '@/components/StorageStatsPanel'
 import BannedUsersPanel from '@/components/BannedUsersPanel'
 import ContentModerationPanel from '@/components/ContentModerationPanel'
 import DeletedPostsCleanup from '@/components/DeletedPostsCleanup'
@@ -46,13 +45,8 @@ export default function AdminDashboard() {
         return <NotificationLogs />
       case 'notifications-cleanup':
         return <NotificationCleanup />
-        case 'images':
-        return (
-          <div className="space-y-6">
-            <ImageSettingsPanel />
-            <StorageStatsPanel />
-          </div>
-        )
+      case 'images':
+        return <ImageSettingsPanel />
         case 'moderation-posts':
         return <ContentModerationPanel />
         case 'moderation-banned':
