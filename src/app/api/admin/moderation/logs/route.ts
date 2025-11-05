@@ -85,11 +85,15 @@ export async function GET(request: NextRequest) {
     }
 
     if (dateFrom) {
-      query = query.gte('created_at', dateFrom)
+      // Convertir fecha a inicio del día en UTC
+      const fromDate = new Date(dateFrom + 'T00:00:00.000Z')
+      query = query.gte('created_at', fromDate.toISOString())
     }
 
     if (dateTo) {
-      query = query.lte('created_at', dateTo)
+      // Convertir fecha a final del día en UTC
+      const toDate = new Date(dateTo + 'T23:59:59.999Z')
+      query = query.lte('created_at', toDate.toISOString())
     }
 
     // Ordenar por más recientes primero
@@ -180,12 +184,37 @@ export async function DELETE(request: NextRequest) {
     const body = await request.json()
     const { log_ids } = body
 
-    if (!log_ids || !Array.isArray(log_ids) || log_ids.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'log_ids array is required' },
-        { status: 400 }
-      )
-    }
+if (!log_ids || !Array.isArray(log_ids) || log_ids.length === 0) {
+  return NextResponse.json(
+    { success: false, error: 'log_ids array is required' },
+    { status: 400 }
+  )
+}
+
+// NUEVO: Límite de seguridad para eliminación masiva
+const MAX_DELETE_LIMIT = 1000
+if (log_ids.length > MAX_DELETE_LIMIT) {
+  return NextResponse.json(
+    { 
+      success: false, 
+      error: `Cannot delete more than ${MAX_DELETE_LIMIT} logs at once. You selected ${log_ids.length} logs.` 
+    },
+    { status: 400 }
+  )
+}
+
+// Validar que todos los IDs sean strings válidos (UUIDs)
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const invalidIds = log_ids.filter(id => typeof id !== 'string' || !uuidRegex.test(id))
+if (invalidIds.length > 0) {
+  return NextResponse.json(
+    { 
+      success: false, 
+      error: `Invalid log IDs detected: ${invalidIds.length} invalid IDs` 
+    },
+    { status: 400 }
+  )
+}
 
     const supabase = createServerSupabaseAdminClient()
 
@@ -204,11 +233,13 @@ export async function DELETE(request: NextRequest) {
     }
 
     return NextResponse.json({
-      success: true,
-      data: {
-        deleted_count: count || 0
-      }
-    })
+  success: true,
+  data: {
+    deleted_count: count || 0,
+    requested_count: log_ids.length,
+    message: `Successfully deleted ${count || 0} moderation logs`
+  }
+})
 
   } catch (error) {
     console.error('Error in DELETE moderation logs:', error)
