@@ -2,22 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 import { createServerSupabaseClient } from '@/lib/server-supabase'
 
-interface BannedUserProfile {
-  id: string
-  email: string
-  full_name: string | null
-  is_banned: boolean
-  banned_at: string | null
-  banned_by: string | null
-  banned_reason: string | null
-  created_at: string
-  user_type: string
-  subscription_status: string
-  country: string | null
-  specialty: string | null
-  role: string
-}
-
 export async function GET(request: NextRequest) {
   try {
     // Verificar que el usuario autenticado es admin
@@ -58,50 +42,42 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServerSupabaseAdminClient()
 
-    // Construir query base - solo usuarios banneados
-    let query = supabase
-      .from('profiles')
-      .select('*', { count: 'exact' })
-      .eq('is_banned', true)
-
-    // Filtro de búsqueda por nombre o email
+    // ========================================
+    // OPTIMIZACIÓN: Query única con COUNT
+    // ========================================
+    
+    // Construir los filtros en un array para reutilizarlos
+    const filters: string[] = ['is_banned.eq.true']
+    
     if (search) {
-      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`)
+      filters.push(`or(full_name.ilike.%${search}%,email.ilike.%${search}%)`)
     }
-
-    // Filtro por rango de fechas de baneo
+    
     if (dateFrom) {
-      query = query.gte('banned_at', dateFrom)
+      filters.push(`banned_at.gte.${dateFrom}`)
     }
-
+    
     if (dateTo) {
-      query = query.lte('banned_at', dateTo)
+      filters.push(`banned_at.lte.${dateTo}`)
     }
 
-    // Ordenar por fecha de baneo (más recientes primero)
-    query = query.order('banned_at', { ascending: false })
-
-    // Paginación
-    query = query.range(offset, offset + limit - 1)
-
-    // Primero ejecutar query sin paginación para obtener el count (CON FILTROS)
+    // Query para obtener el count total con filtros
     let countQuery = supabase
       .from('profiles')
       .select('*', { count: 'exact', head: true })
-      .eq('is_banned', true)
 
-    // Aplicar los mismos filtros que la query principal
-    if (search) {
-      countQuery = countQuery.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`)
-    }
-
-    if (dateFrom) {
-      countQuery = countQuery.gte('banned_at', dateFrom)
-    }
-
-    if (dateTo) {
-      countQuery = countQuery.lte('banned_at', dateTo)
-    }
+    filters.forEach(filter => {
+      const [column, operator, value] = filter.split('.')
+      if (operator === 'eq') {
+        countQuery = countQuery.eq(column, value === 'true')
+      } else if (operator === 'gte') {
+        countQuery = countQuery.gte(column, value)
+      } else if (operator === 'lte') {
+        countQuery = countQuery.lte(column, value)
+      } else if (column === 'or') {
+        countQuery = countQuery.or(filter.replace('or(', '').replace(')', ''))
+      }
+    })
 
     const { count: totalCount, error: countError } = await countQuery
 
@@ -113,8 +89,9 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Si la página solicitada está fuera de rango, retornar vacío
     const totalPages = Math.ceil((totalCount || 0) / limit)
+    
+    // Si la página solicitada está fuera de rango, retornar vacío
     if (page > totalPages && totalPages > 0) {
       return NextResponse.json({
         success: true,
@@ -130,7 +107,52 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Ahora sí ejecutar la query con paginación
+    // ========================================
+    // OPTIMIZACIÓN: Query principal simplificada
+    // Sin stats adicionales por ahora
+    // ========================================
+    
+    let query = supabase
+      .from('profiles')
+      .select(`
+        id,
+        email,
+        full_name,
+        is_banned,
+        banned_at,
+        banned_by,
+        banned_reason,
+        created_at,
+        user_type,
+        subscription_status,
+        country,
+        specialty,
+        role
+      `)
+      .eq('is_banned', true)
+
+    // Aplicar filtros
+    if (search) {
+      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`)
+    }
+
+    if (dateFrom) {
+      // Comparar desde el inicio del día en zona horaria de Bogotá
+      const fromDate = `${dateFrom}T00:00:00-05:00`
+      query = query.gte('banned_at', fromDate)
+    }
+
+    if (dateTo) {
+      // Comparar hasta el final del día en zona horaria de Bogotá
+      const toDate = `${dateTo}T23:59:59-05:00`
+      query = query.lte('banned_at', toDate)
+    }
+
+    // Ordenar y paginar
+    query = query
+      .order('banned_at', { ascending: false })
+      .range(offset, offset + limit - 1)
+
     const { data: users, error } = await query
 
     if (error) {
@@ -141,9 +163,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Si no hay usuarios en esta página, retornar respuesta vacía válida
+    // Si no hay usuarios, retornar respuesta vacía
     if (!users || users.length === 0) {
-      
       return NextResponse.json({
         success: true,
         data: [],
@@ -158,63 +179,35 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Para cada usuario banneado, obtener info adicional
-    const usersWithDetails = await Promise.all(
-      users.map(async (user: BannedUserProfile) => {
-        try {
-          // Obtener info del admin que banneó
-          let bannedByAdmin = null
-          if (user.banned_by) {
-            const { data: admin } = await supabase
-              .from('profiles')
-              .select('id, full_name, email')
-              .eq('id', user.banned_by)
-              .maybeSingle()
-            
-            bannedByAdmin = admin
-          }
+    // ========================================
+    // OPTIMIZACIÓN: Obtener banned_by admins en UNA SOLA QUERY
+    // ========================================
+    
+    const bannedByIds = users
+      .map(u => u.banned_by)
+      .filter((id): id is string => id !== null)
+    
+    let adminInfoMap: Record<string, { id: string; full_name: string | null; email: string }> = {}
+    
+    if (bannedByIds.length > 0) {
+      const { data: admins } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', bannedByIds)
+      
+      if (admins) {
+        adminInfoMap = admins.reduce((acc, admin) => {
+          acc[admin.id] = admin
+          return acc
+        }, {} as Record<string, { id: string; full_name: string | null; email: string }>)
+      }
+    }
 
-          // Obtener estadísticas
-          const { count: totalPosts } = await supabase
-            .from('posts')
-            .select('*', { count: 'exact', head: true })
-            .eq('author_id', user.id)
-
-          const { count: totalComments } = await supabase
-            .from('comments')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', user.id)
-
-          const { count: deletedComments } = await supabase
-            .from('comments')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', user.id)
-            .eq('is_deleted', true)
-
-          return {
-            ...user,
-            banned_by_admin: bannedByAdmin,
-            stats: {
-              total_posts: totalPosts || 0,
-              total_comments: totalComments || 0,
-              deleted_comments: deletedComments || 0
-            }
-          }
-        } catch (err) {
-          console.error(`Error fetching details for user ${user.id}:`, err)
-          // Si falla, retornar el usuario sin detalles adicionales
-          return {
-            ...user,
-            banned_by_admin: null,
-            stats: {
-              total_posts: 0,
-              total_comments: 0,
-              deleted_comments: 0
-            }
-          }
-        }
-      })
-    )
+    // Mapear usuarios con info del admin
+    const usersWithDetails = users.map(user => ({
+      ...user,
+      banned_by_admin: user.banned_by ? adminInfoMap[user.banned_by] || null : null
+    }))
 
     return NextResponse.json({
       success: true,

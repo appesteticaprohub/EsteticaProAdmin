@@ -280,12 +280,12 @@ export default function BannedUsersPanel() {
               )}
               {activeFilters.dateFrom && (
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  Desde: {new Date(activeFilters.dateFrom).toLocaleDateString('es-ES')}
+                  Desde: {activeFilters.dateFrom}
                 </span>
               )}
               {activeFilters.dateTo && (
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  Hasta: {new Date(activeFilters.dateTo).toLocaleDateString('es-ES')}
+                  Hasta: {activeFilters.dateTo}
                 </span>
               )}
             </div>
