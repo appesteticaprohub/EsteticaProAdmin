@@ -3,9 +3,11 @@ import { createServerSupabaseAdminClient, createServerSupabaseClient } from '@/l
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id: commentId } = await params
+    
     // Verificar autenticación admin
     const supabaseAuth = await createServerSupabaseClient()
     const { data: { user: adminUser }, error: authError } = await supabaseAuth.auth.getUser()
@@ -29,8 +31,6 @@ export async function POST(
         { status: 403 }
       )
     }
-
-    const commentId = params.id
     const supabase = createServerSupabaseAdminClient()
 
     // Verificar que el comentario existe
