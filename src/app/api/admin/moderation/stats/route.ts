@@ -2,9 +2,43 @@ import { NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
 import { createServerSupabaseClient } from '@/lib/server-supabase'
 
+// ========== INTERFACES DE TIPADO ==========
+interface ModerationStats {
+  posts: {
+    total: number
+    today: number
+    this_week: number
+    this_month: number
+    deleted_today: number
+    deleted_week: number
+    deleted_month: number
+    pending_review: number
+  }
+  comments: {
+    total: number
+    today: number
+    this_week: number
+    this_month: number
+    deleted_today: number
+    deleted_week: number
+    deleted_month: number
+  }
+  users: {
+    total_active: number
+    total_banned: number
+    banned_today: number
+    banned_week: number
+    banned_month: number
+  }
+}
+
+interface StatsCacheData {
+  stats: ModerationStats
+}
+
 // ========== SISTEMA DE CACHÉ ==========
 interface StatsCache {
-  data: any | null
+  data: StatsCacheData | null
   timestamp: number
 }
 
@@ -20,11 +54,11 @@ function isCacheValid(): boolean {
   return statsCache.data !== null && (now - statsCache.timestamp) < CACHE_DURATION
 }
 
-function getCachedStats() {
+function getCachedStats(): StatsCacheData | null {
   return statsCache.data
 }
 
-function setCacheStats(data: any) {
+function setCacheStats(data: StatsCacheData) {
   statsCache.data = data
   statsCache.timestamp = Date.now()
 }
@@ -64,12 +98,14 @@ export async function GET() {
     // ========== VERIFICAR CACHÉ ==========
     if (isCacheValid()) {
       const cachedData = getCachedStats()
-      return NextResponse.json({
-        success: true,
-        data: cachedData.stats,
-        cached: true,
-        cache_expires_in: Math.round((CACHE_DURATION - (Date.now() - statsCache.timestamp)) / 1000) // segundos restantes
-      })
+      if (cachedData) {
+        return NextResponse.json({
+          success: true,
+          data: cachedData.stats,
+          cached: true,
+          cache_expires_in: Math.round((CACHE_DURATION - (Date.now() - statsCache.timestamp)) / 1000) // segundos restantes
+        })
+      }
     }
 
     // ========== SI NO HAY CACHÉ VÁLIDO, EJECUTAR QUERIES ==========
