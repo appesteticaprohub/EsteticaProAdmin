@@ -13,8 +13,9 @@ interface CommentsTreeViewProps {
     comments_per_page: number
     has_more: boolean
   }
-  onLoadMore?: () => void
-  loadingMore?: boolean
+  currentPage?: number
+  onPageChange?: (page: number) => void
+  loading?: boolean
   onCommentDeleted?: () => void
   onUserBanned?: () => void
 }
@@ -26,12 +27,52 @@ interface CommentNode extends CommentWithUser {
 export default function CommentsTreeView({
   comments,
   pagination,
-  onLoadMore,
-  loadingMore = false,
+  currentPage = 1,
+  onPageChange,
+  loading = false,
   onCommentDeleted,
   onUserBanned
 }: CommentsTreeViewProps) {
   const [filter, setFilter] = useState<'all' | 'active' | 'deleted'>('all')
+  
+  // Función para generar números de página a mostrar
+  const getPageNumbers = () => {
+    if (!pagination) return []
+    
+    const { current_page, total_pages } = pagination
+    const pages: (number | string)[] = []
+    
+    if (total_pages <= 7) {
+      // Si hay 7 o menos páginas, mostrar todas
+      for (let i = 1; i <= total_pages; i++) {
+        pages.push(i)
+      }
+    } else {
+      // Siempre mostrar primera página
+      pages.push(1)
+      
+      if (current_page > 3) {
+        pages.push('...')
+      }
+      
+      // Páginas alrededor de la actual
+      const start = Math.max(2, current_page - 1)
+      const end = Math.min(total_pages - 1, current_page + 1)
+      
+      for (let i = start; i <= end; i++) {
+        pages.push(i)
+      }
+      
+      if (current_page < total_pages - 2) {
+        pages.push('...')
+      }
+      
+      // Siempre mostrar última página
+      pages.push(total_pages)
+    }
+    
+    return pages
+  }
   const [collapsedThreads, setCollapsedThreads] = useState<Set<string>>(new Set())
   const [actionLoading, setActionLoading] = useState(false)
   
@@ -432,25 +473,58 @@ export default function CommentsTreeView({
           </div>
         )}
 
-        {/* Botón para cargar más comentarios */}
-        {pagination && pagination.has_more && onLoadMore && (
-          <div className="mt-6 text-center">
+        {/* Controles de paginación */}
+        {pagination && pagination.total_pages > 1 && onPageChange && (
+          <div className="mt-6 flex items-center justify-center gap-2">
+            {/* Botón Anterior */}
             <button
-              onClick={onLoadMore}
-              disabled={loadingMore}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
+              onClick={() => onPageChange(currentPage - 1)}
+              disabled={currentPage === 1 || loading}
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:text-gray-500 transition-colors font-medium"
             >
-              {loadingMore ? (
-                <>
-                  <span className="inline-block animate-spin mr-2">⏳</span>
-                  Cargando comentarios...
-                </>
-              ) : (
-                <>
-                  Cargar más comentarios ({pagination.total_comments - comments.length} restantes)
-                </>
-              )}
+              ← Anterior
             </button>
+
+            {/* Números de página */}
+            <div className="flex items-center gap-1">
+              {getPageNumbers().map((page, index) => (
+                typeof page === 'number' ? (
+                  <button
+                    key={index}
+                    onClick={() => onPageChange(page)}
+                    disabled={loading}
+                    className={`min-w-[40px] h-[40px] rounded-lg font-medium transition-colors ${
+                      currentPage === page
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:hover:bg-gray-200'
+                    } disabled:cursor-not-allowed`}
+                  >
+                    {page}
+                  </button>
+                ) : (
+                  <span key={index} className="px-2 text-gray-500">
+                    {page}
+                  </span>
+                )
+              ))}
+            </div>
+
+            {/* Botón Siguiente */}
+            <button
+              onClick={() => onPageChange(currentPage + 1)}
+              disabled={currentPage === pagination.total_pages || loading}
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:text-gray-500 transition-colors font-medium"
+            >
+              Siguiente →
+            </button>
+          </div>
+        )}
+
+        {/* Indicador de carga */}
+        {loading && (
+          <div className="mt-4 text-center">
+            <span className="inline-block animate-spin text-2xl">⏳</span>
+            <p className="text-sm text-gray-600 mt-2">Cargando comentarios...</p>
           </div>
         )}
       </div>

@@ -67,19 +67,8 @@ export default function PostDetailModal({
       if (!result.success || !result.data) {
         setError(result.success === false ? 'Error al cargar el post' : 'Post no encontrado')
       } else {
-        // Si es página 1, reemplazar todos los datos
-        if (page === 1) {
-          setPostDetail(result.data)
-        } else {
-          // Si es página > 1, agregar comentarios nuevos
-          setPostDetail(prev => {
-            if (!prev) return result.data
-            return {
-              ...result.data,
-              comments: [...(prev.comments || []), ...(result.data.comments || [])]
-            }
-          })
-        }
+        // SIEMPRE reemplazar todos los datos (no acumular)
+        setPostDetail(result.data)
         
         // Actualizar metadata de paginación
         if (result.data.comments_pagination) {
@@ -290,10 +279,9 @@ const formatDate = (dateString: string) => {
   })
 }
 
-  const handleLoadMoreComments = async () => {
-    const nextPage = commentsPage + 1
-    setCommentsPage(nextPage)
-    await fetchPostDetail(nextPage)
+  const handleChangePage = async (newPage: number) => {
+    setCommentsPage(newPage)
+    await fetchPostDetail(newPage)
   }
 
   if (!isOpen) return null
@@ -567,8 +555,9 @@ const formatDate = (dateString: string) => {
                     <CommentsTreeView
                       comments={postDetail.comments}
                       pagination={commentsPagination}
-                      onLoadMore={commentsPagination.has_more ? handleLoadMoreComments : undefined}
-                      loadingMore={loading && commentsPage > 1}
+                      currentPage={commentsPage}
+                      onPageChange={handleChangePage}
+                      loading={loading}
                       onCommentDeleted={() => {
                         setCommentsPage(1)
                         fetchPostDetail(1)
