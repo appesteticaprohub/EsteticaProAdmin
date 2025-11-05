@@ -71,20 +71,8 @@ export default function CommentsTreeView({
     return rootComments
   }
 
-  // Filtrar comentarios según el filtro activo
-  const filterComments = (comments: CommentWithUser[]): CommentWithUser[] => {
-    switch (filter) {
-      case 'active':
-        return comments.filter(c => !c.is_deleted)
-      case 'deleted':
-        return comments.filter(c => c.is_deleted)
-      default:
-        return comments
-    }
-  }
 
-
-
+  
   const toggleThread = (commentId: string) => {
     const newCollapsed = new Set(collapsedThreads)
     if (newCollapsed.has(commentId)) {
@@ -354,15 +342,21 @@ export default function CommentsTreeView({
     )
   }
 
-  const filteredComments = useMemo(
-  () => filterComments(comments),
-  [comments, filter]
-)
+  const filteredComments = useMemo(() => {
+    switch (filter) {
+      case 'active':
+        return comments.filter(c => !c.is_deleted)
+      case 'deleted':
+        return comments.filter(c => c.is_deleted)
+      default:
+        return comments
+    }
+  }, [comments, filter])
 
-const commentTree = useMemo(
-  () => buildCommentTree(filteredComments),
-  [filteredComments]
-)
+  const commentTree = useMemo(
+    () => buildCommentTree(filteredComments),
+    [filteredComments]
+  )
   
   const stats = {
     total: comments.length,

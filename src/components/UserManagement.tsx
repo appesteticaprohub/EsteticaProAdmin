@@ -59,7 +59,7 @@ const cacheRef = useRef<Map<string, {
 const getCacheKey = useCallback(() => {
   const filterEntries = Object.entries(filters)
     .filter((entry): entry is [string, string] => {
-      const [_, value] = entry
+      const [, value] = entry
       return typeof value === 'string' && value.length > 0
     })
     .map(([key, value]) => `${key}:${value}`)
@@ -216,12 +216,6 @@ const handleSearchEmailChange = (value: string) => {
     setSelectedUser(user)
     setShowModal(true)
   }
-
-  // Función para invalidar caché (útil después de banear/actualizar usuarios)
-const invalidateCache = useCallback(() => {
-  console.log('🗑️ Limpiando caché')
-  cacheRef.current.clear()
-}, [])
 
   const handleCloseModal = () => {
     setShowModal(false)

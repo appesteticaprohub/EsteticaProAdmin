@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
-import type { ApiResponse, LogsResponse, LogsFilters, EmailLog, Notification } from '@/types/admin'
+import type { ApiResponse, LogsResponse, LogsFilters, EmailLog } from '@/types/admin'
 
 interface UserProfile {
   id: string
