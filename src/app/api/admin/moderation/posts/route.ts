@@ -242,7 +242,7 @@ export async function GET(request: NextRequest) {
 
 // NUEVO: Obtener conteo de comentarios no revisados por post
 const postIds = (posts as PostFromDB[] | null)?.map((post) => post.id).filter(Boolean) || []
-let unreviewedCommentsMap: Record<string, number> = {}
+const unreviewedCommentsMap: Record<string, number> = {}
 
 if (postIds.length > 0) {
   const { data: unreviewedCounts, error: unreviewedError } = await supabase
