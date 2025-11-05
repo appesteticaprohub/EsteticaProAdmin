@@ -22,8 +22,13 @@ export default function DeletedPostsCleanup({ onPostsDeleted }: DeletedPostsClea
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [confirmText, setConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(0)
+  const [totalRecords, setTotalRecords] = useState(0)
+  const limit = 50
+  const [hasSearched, setHasSearched] = useState(false)
 
-  const handleSearch = async () => {
+  const handleSearch = async (page: number = 1) => {
     if (!dateFrom || !dateTo) {
       alert('Por favor selecciona ambas fechas')
       return
@@ -36,10 +41,12 @@ export default function DeletedPostsCleanup({ onPostsDeleted }: DeletedPostsClea
 
     setLoading(true)
     setSelectedPosts(new Set())
+    setCurrentPage(page)
+    setHasSearched(true)
 
     try {
       const response = await fetch(
-        `/api/admin/cleanup-deleted-posts?dateFrom=${dateFrom}&dateTo=${dateTo}`
+        `/api/admin/cleanup-deleted-posts?dateFrom=${dateFrom}&dateTo=${dateTo}&page=${page}&limit=${limit}`
       )
 
       if (!response.ok) {
@@ -51,6 +58,9 @@ export default function DeletedPostsCleanup({ onPostsDeleted }: DeletedPostsClea
       if (result.success) {
         setDeletedPosts(result.data)
         setSummary(result.summary)
+        setTotalPages(result.pagination.total_pages)
+        setTotalRecords(result.total_records)
+        setCurrentPage(result.pagination.current_page)
       } else {
         throw new Error('Error en la respuesta del servidor')
       }
@@ -59,6 +69,30 @@ export default function DeletedPostsCleanup({ onPostsDeleted }: DeletedPostsClea
       alert('Error al buscar posts eliminados')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      handleSearch(currentPage + 1)
+    }
+  }
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      handleSearch(currentPage - 1)
+    }
+  }
+
+  const handleFirstPage = () => {
+    if (currentPage !== 1) {
+      handleSearch(1)
+    }
+  }
+
+  const handleLastPage = () => {
+    if (currentPage !== totalPages) {
+      handleSearch(totalPages)
     }
   }
 
@@ -127,8 +161,8 @@ export default function DeletedPostsCleanup({ onPostsDeleted }: DeletedPostsClea
           `Likes eliminados: ${result.likes_deleted}`
         )
         
-        // Recargar la lista
-        await handleSearch()
+        // Recargar la lista en la página actual
+        await handleSearch(currentPage)
         setShowDeleteModal(false)
         setConfirmText('')
         onPostsDeleted?.()
@@ -202,7 +236,7 @@ export default function DeletedPostsCleanup({ onPostsDeleted }: DeletedPostsClea
 
           <div className="flex items-end">
             <button
-              onClick={handleSearch}
+              onClick={() => handleSearch()}
               disabled={loading}
               className="w-full px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
             >
@@ -210,6 +244,20 @@ export default function DeletedPostsCleanup({ onPostsDeleted }: DeletedPostsClea
             </button>
           </div>
         </div>
+
+        {/* Información de paginación */}
+        {totalRecords > 0 && (
+          <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="text-sm text-gray-700">
+              Mostrando <span className="font-semibold">{(currentPage - 1) * limit + 1}</span> a{' '}
+              <span className="font-semibold">{Math.min(currentPage * limit, totalRecords)}</span> de{' '}
+              <span className="font-semibold">{totalRecords}</span> posts eliminados
+            </div>
+            <div className="text-sm text-gray-600">
+              Página {currentPage} de {totalPages}
+            </div>
+          </div>
+        )}
 
         {/* Resumen de búsqueda */}
         {deletedPosts.length > 0 && (
@@ -339,6 +387,49 @@ export default function DeletedPostsCleanup({ onPostsDeleted }: DeletedPostsClea
               </tbody>
             </table>
           </div>
+          {/* Controles de paginación */}
+          {totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleFirstPage()}
+                  disabled={currentPage === 1 || loading}
+                  className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  Primera
+                </button>
+                <button
+                  onClick={() => handlePrevPage()}
+                  disabled={currentPage === 1 || loading}
+                  className="px-4 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  ← Anterior
+                </button>
+              </div>
+
+              <div className="text-sm text-gray-700">
+                Página <span className="font-semibold">{currentPage}</span> de{' '}
+                <span className="font-semibold">{totalPages}</span>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleNextPage()}
+                  disabled={currentPage === totalPages || loading}
+                  className="px-4 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  Siguiente →
+                </button>
+                <button
+                  onClick={() => handleLastPage()}
+                  disabled={currentPage === totalPages || loading}
+                  className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  Última
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -424,7 +515,7 @@ export default function DeletedPostsCleanup({ onPostsDeleted }: DeletedPostsClea
       )}
 
       {/* Estado vacío */}
-      {!loading && deletedPosts.length === 0 && dateFrom && dateTo && (
+      {!loading && deletedPosts.length === 0 && hasSearched && (
         <div className="bg-white rounded-lg shadow p-12 text-center">
           <p className="text-gray-500 text-lg">
             No se encontraron posts eliminados en el rango de fechas seleccionado

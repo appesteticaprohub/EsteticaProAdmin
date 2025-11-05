@@ -53,6 +53,8 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const dateFrom = searchParams.get('dateFrom')
     const dateTo = searchParams.get('dateTo')
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '50')
 
     if (!dateFrom || !dateTo) {
       return NextResponse.json(
@@ -67,7 +69,26 @@ const supabase = createServerSupabaseAdminClient()
 const dateFromISO = `${dateFrom}T00:00:00.000Z`
 const dateToISO = `${dateTo}T23:59:59.999Z`
 
-// Obtener posts eliminados en el rango de fechas
+// Calcular offset para paginación
+const offset = (page - 1) * limit
+
+// Primero obtener el conteo total
+const { count: totalCount, error: countError } = await supabase
+  .from('posts')
+  .select('id', { count: 'exact', head: true })
+  .eq('is_deleted', true)
+  .gte('deleted_at', dateFromISO)
+  .lte('deleted_at', dateToISO)
+
+if (countError) {
+  console.error('Error counting deleted posts:', countError)
+  return NextResponse.json(
+    { success: false, error: 'Failed to count deleted posts' },
+    { status: 500 }
+  )
+}
+
+// Obtener posts eliminados en el rango de fechas con paginación
 const { data: deletedPosts, error: postsError } = await supabase
   .from('posts')
   .select(`
@@ -86,6 +107,7 @@ const { data: deletedPosts, error: postsError } = await supabase
   .gte('deleted_at', dateFromISO)
   .lte('deleted_at', dateToISO)
   .order('deleted_at', { ascending: false })
+  .range(offset, offset + limit - 1)
 
     if (postsError) {
       console.error('Error fetching deleted posts:', postsError)
@@ -99,7 +121,14 @@ const { data: deletedPosts, error: postsError } = await supabase
       return NextResponse.json<DeletedPostsListResponse>({
         success: true,
         data: [],
-        total_records: 0,
+        total_records: totalCount || 0,
+        pagination: {
+          current_page: page,
+          total_pages: 0,
+          limit: limit,
+          has_next: false,
+          has_prev: false
+        },
         summary: {
           total_posts: 0,
           total_images: 0,
@@ -144,10 +173,20 @@ const { data: deletedPosts, error: postsError } = await supabase
       total_likes: postsWithAuthors.reduce((sum, p) => sum + p.likes_count, 0)
     }
 
+    // Calcular paginación
+    const totalPages = Math.ceil((totalCount || 0) / limit)
+
     return NextResponse.json<DeletedPostsListResponse>({
       success: true,
       data: postsWithAuthors,
-      total_records: postsWithAuthors.length,
+      total_records: totalCount || 0,
+      pagination: {
+        current_page: page,
+        total_pages: totalPages,
+        limit: limit,
+        has_next: page < totalPages,
+        has_prev: page > 1
+      },
       summary
     })
 

@@ -522,6 +522,13 @@ export interface DeletedPostsListResponse {
   success: boolean
   data: DeletedPostItem[]
   total_records: number
+  pagination: {
+    current_page: number
+    total_pages: number
+    limit: number
+    has_next: boolean
+    has_prev: boolean
+  }
   summary: {
     total_posts: number
     total_images: number
