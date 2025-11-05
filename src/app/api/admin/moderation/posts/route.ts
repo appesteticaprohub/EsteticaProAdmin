@@ -236,8 +236,29 @@ export async function GET(request: NextRequest) {
       )
     }
 
+
     // PASO 3: Obtener información de autores para los posts obtenidos
     const postAuthorIds = (posts as PostFromDB[] | null)?.map((post) => post.author_id).filter(Boolean) || []
+
+// NUEVO: Obtener conteo de comentarios no revisados por post
+const postIds = (posts as PostFromDB[] | null)?.map((post) => post.id).filter(Boolean) || []
+let unreviewedCommentsMap: Record<string, number> = {}
+
+if (postIds.length > 0) {
+  const { data: unreviewedCounts, error: unreviewedError } = await supabase
+    .from('comments')
+    .select('post_id')
+    .in('post_id', postIds)
+    .eq('is_reviewed', false)
+    .eq('is_deleted', false)
+
+  if (!unreviewedError && unreviewedCounts) {
+    // Contar comentarios no revisados por post
+    unreviewedCounts.forEach((comment: { post_id: string }) => {
+      unreviewedCommentsMap[comment.post_id] = (unreviewedCommentsMap[comment.post_id] || 0) + 1
+    })
+  }
+}
     
     let authors: AuthorFullFromDB[] = []
     if (postAuthorIds.length > 0) {
@@ -256,11 +277,12 @@ export async function GET(request: NextRequest) {
       authors = authorsData || []
     }
 
-    // PASO 4: Mapear autores a posts
-    const postsWithAuthors: PostWithAuthor[] = (posts as PostFromDB[] | null)?.map((post) => ({
-      ...post,
-      author: authors.find((author) => author.id === post.author_id) || null
-    })) || []
+    // PASO 4: Mapear autores a posts e incluir contador de comentarios no revisados
+const postsWithAuthors: PostWithAuthor[] = (posts as PostFromDB[] | null)?.map((post) => ({
+  ...post,
+  author: authors.find((author) => author.id === post.author_id) || null,
+  unreviewed_comments_count: unreviewedCommentsMap[post.id] || 0
+})) || []
 
     // Calcular paginación
     const totalPages = Math.ceil((count || 0) / limit)

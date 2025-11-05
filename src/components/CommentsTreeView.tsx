@@ -157,6 +157,33 @@ export default function CommentsTreeView({
     }
   }
 
+  const handleApproveComment = async (commentId: string) => {
+  if (!confirm('¿Marcar este comentario como revisado?')) {
+    return
+  }
+
+  try {
+    setActionLoading(true)
+    const response = await fetch(`/api/admin/moderation/comments/${commentId}/approve`, {
+      method: 'POST'
+    })
+
+    const result = await response.json()
+
+    if (result.success) {
+      alert('Comentario marcado como revisado')
+      onCommentDeleted?.() // Recargar datos
+    } else {
+      alert('Error al aprobar comentario: ' + (result.error || 'Error desconocido'))
+    }
+  } catch (err) {
+    alert('Error al aprobar comentario')
+    console.error(err)
+  } finally {
+    setActionLoading(false)
+  }
+}
+
   const openBanModal = (userId: string, userName: string, userEmail: string) => {
     setUserToBan({ id: userId, name: userName, email: userEmail })
     setBanModalOpen(true)
@@ -226,6 +253,15 @@ export default function CommentsTreeView({
                     Banneado
                   </span>
                 )}
+                {comment.is_reviewed ? (
+                  <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full">
+                    ✓ Revisado
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 bg-orange-100 text-orange-800 text-xs rounded-full font-semibold">
+                    ⚠️ Pendiente
+                  </span>
+                )}
                 {level > 0 && (
                   <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
                     Nivel {level}
@@ -274,6 +310,15 @@ export default function CommentsTreeView({
             ) : (
               // Si está activo, mostrar botones normales
               <>
+                {!comment.is_reviewed && (
+                  <button
+                    onClick={() => handleApproveComment(comment.id)}
+                    disabled={actionLoading}
+                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    ✅ Marcar Revisado
+                  </button>
+                )}
                 <button
                   onClick={() => handleDeleteComment(comment.id)}
                   disabled={actionLoading}

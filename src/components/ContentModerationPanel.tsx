@@ -550,6 +550,11 @@ export default function ContentModerationPanel() {
                     <div className="flex items-center gap-4 text-sm text-gray-600">
                       <span>📷 {post.images?.length || 0}</span>
                       <span>💬 {post.comments_count}</span>
+                      {post.unreviewed_comments_count > 0 && (
+                        <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-semibold">
+                          ⚠️ {post.unreviewed_comments_count} sin revisar
+                        </span>
+                      )}
                       <span>❤️ {post.likes_count}</span>
                       <span>👁️ {post.views_count}</span>
                       <span className="text-xs">

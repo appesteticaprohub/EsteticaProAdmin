@@ -247,7 +247,7 @@ export interface UnbanUserRequest {
 export interface ModerationLog {
   id: string
   admin_id: string
-  action_type: 'ban_user' | 'unban_user' | 'delete_post' | 'delete_comment' | 'approve_post' | 'restore_post' | 'restore_comment'
+  action_type: 'ban_user' | 'unban_user' | 'delete_post' | 'delete_comment' | 'approve_post' | 'approve_comment' | 'restore_post' | 'restore_comment'
   target_type: 'user' | 'post' | 'comment'
   target_id: string
   reason: string | null
@@ -273,6 +273,7 @@ export interface PostWithAuthor extends Post {
   reviewed_by: string | null
   is_deleted: boolean
   deleted_at: string | null
+  unreviewed_comments_count: number
 }
 
 export interface CommentWithUser extends Comment {
@@ -282,6 +283,7 @@ export interface CommentWithUser extends Comment {
     email: string
     is_banned: boolean
   }
+  is_reviewed: boolean
   reviewed_at: string | null
   reviewed_by: string | null
 }
