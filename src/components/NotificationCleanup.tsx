@@ -1,98 +1,114 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface CleanupPreview {
   notifications_count: number
-  email_logs_count: number
   breakdown: {
     by_category: Record<string, number>
-    by_type: Record<string, number>
     by_read_status: { read: number; unread: number }
   }
+  estimated_batches: number
+  estimated_time_minutes: number
+  exceeds_limit: boolean
 }
 
 interface CleanupResult {
   notifications_deleted: number
-  email_logs_deleted: number
-  total_deleted: number
+  batches_processed: number
+  time_elapsed_seconds: number
 }
 
 export default function NotificationCleanup() {
   const [dateBefore, setDateBefore] = useState('')
   const [category, setCategory] = useState<string>('all')
-  const [type, setType] = useState<string>('all')
   const [isRead, setIsRead] = useState<string>('all')
   const [preview, setPreview] = useState<CleanupPreview | null>(null)
   const [loading, setLoading] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [cleanupResult, setCleanupResult] = useState<CleanupResult | null>(null)
 
+  // Auto-cerrar resultado después de 5 segundos
+  useEffect(() => {
+    if (cleanupResult) {
+      const timer = setTimeout(() => {
+        setCleanupResult(null)
+      }, 5000) // 5 segundos
+
+      return () => clearTimeout(timer)
+    }
+  }, [cleanupResult])
+
   const handlePreview = async () => {
-    if (!dateBefore) {
-      alert('Por favor selecciona una fecha')
-      return
-    }
-
-    setLoading(true)
-    setPreview(null)
-    
-    try {
-      const params = new URLSearchParams({
-        date_before: dateBefore,
-        ...(category !== 'all' && { category }),
-        ...(type !== 'all' && { type }),
-        ...(isRead !== 'all' && { is_read: isRead })
-      })
-
-      const response = await fetch(`/api/admin/notifications/cleanup?${params}`)
-      const result = await response.json()
-
-      if (response.ok && result.data) {
-        setPreview(result.data)
-      } else {
-        alert(result.error || 'Error al obtener preview')
-      }
-    } catch (error) {
-      console.error('Error:', error)
-      alert('Error al obtener preview')
-    } finally {
-      setLoading(false)
-    }
+  if (!dateBefore) {
+    alert('Por favor selecciona una fecha')
+    return
   }
+
+  setLoading(true)
+  setPreview(null)
+  
+  try {
+    const params = new URLSearchParams({
+      date_before: dateBefore,
+      ...(category !== 'all' && { category }),
+      ...(isRead !== 'all' && { is_read: isRead })
+    })
+
+    const response = await fetch(`/api/admin/notifications/cleanup?${params}`)
+    const result = await response.json()
+
+    if (response.ok && result.data) {
+      setPreview(result.data)
+      
+      // ✅ Validar si excede el límite
+      if (result.data.exceeds_limit) {
+        alert('⚠️ La cantidad de registros excede el límite permitido. Por favor ajusta los filtros.')
+      }
+    } else {
+      alert(result.error || 'Error al obtener preview')
+    }
+  } catch (error) {
+    console.error('Error:', error)
+    alert('Error al obtener preview')
+  } finally {
+    setLoading(false)
+  }
+}
 
   const handleCleanup = async () => {
-    setLoading(true)
-    setShowConfirmModal(false)
-    
-    try {
-      const response = await fetch('/api/admin/notifications/cleanup', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date_before: dateBefore,
-          ...(category !== 'all' && { category }),
-          ...(type !== 'all' && { type }),
-          ...(isRead !== 'all' && { is_read: isRead === 'true' })
-        })
+  setLoading(true)
+  setShowConfirmModal(false)
+  
+  try {
+    const response = await fetch('/api/admin/notifications/cleanup', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date_before: dateBefore,
+        ...(category !== 'all' && { category }),
+        ...(isRead !== 'all' && { is_read: isRead === 'true' })
       })
+    })
 
-      const result = await response.json()
+    const result = await response.json()
 
-      if (response.ok && result.data) {
-        setCleanupResult(result.data)
-        setPreview(null)
-        setDateBefore('')
-      } else {
-        alert(result.error || 'Error al ejecutar limpieza')
-      }
-    } catch (error) {
-      console.error('Error:', error)
-      alert('Error al ejecutar limpieza')
-    } finally {
-      setLoading(false)
+    if (response.ok && result.data) {
+      setCleanupResult(result.data)
+      setPreview(null)
+      setDateBefore('')
+      setCategory('all')
+      setIsRead('all')
+    } else {
+      alert(result.error || 'Error al ejecutar limpieza')
     }
+  } catch (error) {
+    console.error('Error:', error)
+    alert('Error al ejecutar limpieza')
+  } finally {
+    setLoading(false)
   }
+}
 
   return (
     <div className="space-y-6">
@@ -100,7 +116,7 @@ export default function NotificationCleanup() {
       <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Limpieza de Notificaciones</h2>
         <p className="text-gray-600">
-          Elimina notificaciones antiguas y logs de emails para mantener la base de datos optimizada
+          Elimina notificaciones in-app antiguas para mantener la base de datos optimizada
         </p>
       </div>
 
@@ -111,7 +127,7 @@ export default function NotificationCleanup() {
           <div>
             <h3 className="font-semibold text-yellow-800 mb-1">Acción Irreversible</h3>
             <p className="text-sm text-yellow-700">
-              Esta operación eliminará permanentemente las notificaciones y logs de email. 
+              Esta operación eliminará permanentemente las notificaciones in-app seleccionadas. 
               Esta acción no se puede deshacer. Usa el preview para verificar antes de eliminar.
             </p>
           </div>
@@ -155,22 +171,6 @@ export default function NotificationCleanup() {
             </select>
           </div>
 
-          {/* Tipo */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tipo
-            </label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">Todos los tipos</option>
-              <option value="in_app">Solo In-App</option>
-              <option value="email">Solo Email</option>
-            </select>
-          </div>
-
           {/* Estado de lectura */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -205,40 +205,51 @@ export default function NotificationCleanup() {
         <div className="bg-white border border-gray-200 rounded-lg p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Preview de Eliminación</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {/* Alerta si excede límite */}
+          {preview.exceeds_limit && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">🚫</span>
+                <div>
+                  <h4 className="font-semibold text-red-800 mb-1">Límite Excedido</h4>
+                  <p className="text-sm text-red-700">
+                    La cantidad de registros supera el límite de seguridad. Por favor ajusta los filtros para reducir el volumen.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Stats principales */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             {/* Total notificaciones */}
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <p className="text-sm text-red-600 mb-1">Notificaciones In-App</p>
-              <p className="text-3xl font-bold text-red-700">{preview.notifications_count}</p>
+              <p className="text-3xl font-bold text-red-700">{preview.notifications_count.toLocaleString()}</p>
             </div>
 
-            {/* Total email logs */}
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-sm text-red-600 mb-1">Logs de Email</p>
-              <p className="text-3xl font-bold text-red-700">{preview.email_logs_count}</p>
+            {/* Batches estimados */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-600 mb-1">Batches a Procesar</p>
+              <p className="text-3xl font-bold text-blue-700">{preview.estimated_batches}</p>
+            </div>
+
+            {/* Tiempo estimado */}
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <p className="text-sm text-purple-600 mb-1">Tiempo Estimado</p>
+              <p className="text-3xl font-bold text-purple-700">{preview.estimated_time_minutes} min</p>
             </div>
           </div>
 
-          {/* Breakdown */}
-          {preview.notifications_count > 0 && (
+          {/* Breakdown - solo si hay datos */}
+          {preview.notifications_count > 0 && Object.keys(preview.breakdown.by_category).length > 0 && (
             <div className="space-y-4">
               <div>
                 <h4 className="text-sm font-semibold text-gray-700 mb-2">Por Categoría:</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {Object.entries(preview.breakdown.by_category).map(([cat, count]) => (
                     <div key={cat} className="bg-gray-50 px-3 py-2 rounded text-sm">
-                      <span className="font-medium">{cat}:</span> {count}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-2">Por Tipo:</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(preview.breakdown.by_type).map(([t, count]) => (
-                    <div key={t} className="bg-gray-50 px-3 py-2 rounded text-sm">
-                      <span className="font-medium">{t}:</span> {count}
+                      <span className="font-medium capitalize">{cat}:</span> {count.toLocaleString()}
                     </div>
                   ))}
                 </div>
@@ -248,11 +259,26 @@ export default function NotificationCleanup() {
                 <h4 className="text-sm font-semibold text-gray-700 mb-2">Por Estado:</h4>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="bg-gray-50 px-3 py-2 rounded text-sm">
-                    <span className="font-medium">Leídas:</span> {preview.breakdown.by_read_status.read}
+                    <span className="font-medium">Leídas:</span> {preview.breakdown.by_read_status.read.toLocaleString()}
                   </div>
                   <div className="bg-gray-50 px-3 py-2 rounded text-sm">
-                    <span className="font-medium">No leídas:</span> {preview.breakdown.by_read_status.unread}
+                    <span className="font-medium">No leídas:</span> {preview.breakdown.by_read_status.unread.toLocaleString()}
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Info adicional para grandes volúmenes */}
+          {preview.notifications_count > 50000 && !preview.exceeds_limit && (
+            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-xl">ℹ️</span>
+                <div>
+                  <p className="text-sm text-blue-700">
+                    <strong>Gran volumen detectado:</strong> El proceso se ejecutará en {preview.estimated_batches} batches 
+                    para garantizar estabilidad. El progreso se mostrará en tiempo real.
+                  </p>
                 </div>
               </div>
             </div>
@@ -262,13 +288,15 @@ export default function NotificationCleanup() {
           <div className="mt-6 pt-6 border-t border-gray-200">
             <button
               onClick={() => setShowConfirmModal(true)}
-              className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-6 rounded-md transition-colors"
+              disabled={preview.exceeds_limit}
+              className="w-full sm:w-auto bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium py-3 px-6 rounded-md transition-colors"
             >
-              Ejecutar Limpieza
+              {preview.exceeds_limit ? 'Ajusta los Filtros' : 'Ejecutar Limpieza'}
             </button>
           </div>
         </div>
       )}
+      
 
       {/* Resultado */}
       {cleanupResult && (
@@ -278,9 +306,9 @@ export default function NotificationCleanup() {
             <div>
               <h3 className="font-semibold text-green-800 mb-2">Limpieza Completada</h3>
               <div className="space-y-1 text-sm text-green-700">
-                <p>Notificaciones eliminadas: <strong>{cleanupResult.notifications_deleted}</strong></p>
-                <p>Email logs eliminados: <strong>{cleanupResult.email_logs_deleted}</strong></p>
-                <p>Total eliminado: <strong>{cleanupResult.total_deleted}</strong></p>
+                <p>Notificaciones eliminadas: <strong>{cleanupResult.notifications_deleted.toLocaleString()}</strong></p>
+                <p>Batches procesados: <strong>{cleanupResult.batches_processed}</strong></p>
+                <p>Tiempo transcurrido: <strong>{cleanupResult.time_elapsed_seconds}s</strong></p>
               </div>
             </div>
           </div>
@@ -293,8 +321,8 @@ export default function NotificationCleanup() {
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-xl font-bold text-gray-900 mb-4">Confirmar Eliminación</h3>
             <p className="text-gray-600 mb-6">
-              Estás a punto de eliminar <strong>{(preview?.notifications_count || 0) + (preview?.email_logs_count || 0)}</strong> registros.
-              Esta acción es <strong>irreversible</strong>.
+              Estás a punto de eliminar <strong>{preview?.notifications_count.toLocaleString() || 0}</strong> notificaciones in-app.
+              Esta acción es <strong>irreversible</strong> y se procesará en <strong>{preview?.estimated_batches || 0}</strong> batches.
             </p>
             <div className="flex gap-3">
               <button
