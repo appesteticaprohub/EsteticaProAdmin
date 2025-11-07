@@ -16,7 +16,7 @@ export class NotificationBroadcastService {
     
     let query = supabase
       .from('profiles')
-      .select('id, email, full_name, subscription_status, country, specialty, created_at, user_type, birth_date, subscription_expires_at, auto_renewal_enabled, is_banned, role')
+      .select('id, email, full_name, subscription_status, country, specialty, created_at, user_type, birth_date, subscription_expires_at, auto_renewal_enabled, is_banned, role, last_payment_amount, last_payment_date')
 
     // Aplicar filtros según tipo de audiencia
     switch (audience.type) {
@@ -415,7 +415,7 @@ export class NotificationBroadcastService {
       // Obtener todos los usuarios activos
       const { data: users, error } = await supabase
         .from('profiles')
-        .select('id, email, full_name, subscription_status')
+        .select('id, email, full_name, subscription_status, last_payment_amount, last_payment_date')
         .in('subscription_status', ['Active', 'Payment_Failed', 'Grace_Period'])
 
       if (error || !users) {
