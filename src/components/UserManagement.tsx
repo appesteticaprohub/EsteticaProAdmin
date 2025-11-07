@@ -625,6 +625,21 @@ const handleSearchEmailChange = (value: string) => {
                     {formatDateBogota(selectedUser.created_at)}
                   </p>
                 </div>
+                {/* Último monto pagado */}
+                <div className="border-b border-gray-200 pb-3">
+                  <p className="text-sm font-medium text-gray-500">Último Monto Pagado</p>
+                  <p className="text-sm text-gray-900 mt-1">
+                    {selectedUser.last_payment_amount ? `$${selectedUser.last_payment_amount}` : '-'}
+                  </p>
+                </div>
+
+                {/* Fecha del último pago */}
+                <div className="border-b border-gray-200 pb-3">
+                  <p className="text-sm font-medium text-gray-500">Fecha del Último Pago</p>
+                  <p className="text-sm text-gray-900 mt-1">
+                    {formatDateBogota(selectedUser.last_payment_date)}
+                  </p>
+                </div>
               </div>
             </div>
 

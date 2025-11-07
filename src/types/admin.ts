@@ -18,6 +18,8 @@ export interface Profile {
   auto_renewal_enabled: boolean
   is_banned: boolean
   role: string
+  last_payment_amount: number | null
+  last_payment_date: string | null
 }
 
 export interface Post {
