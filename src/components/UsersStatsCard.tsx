@@ -87,11 +87,11 @@ export default function UsersStatsCard() {
   }
 
   // Filtrar solo estados válidos del breakdown
-  const getFilteredBreakdown = (breakdown: Record<string, number>) => {
-    return Object.entries(breakdown)
-      .filter(([status]) => VALID_SUBSCRIPTION_STATES.includes(status as any))
-      .sort(([, a], [, b]) => b - a) // Ordenar por cantidad descendente
-  }
+const getFilteredBreakdown = (breakdown: Record<string, number>) => {
+  return Object.entries(breakdown)
+    .filter(([status]) => (VALID_SUBSCRIPTION_STATES as readonly string[]).includes(status))
+    .sort(([, a], [, b]) => b - a) // Ordenar por cantidad descendente
+}
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
