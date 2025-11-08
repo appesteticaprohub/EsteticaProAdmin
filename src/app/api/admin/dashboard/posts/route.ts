@@ -12,20 +12,18 @@ export async function GET(request: Request) {
 
     const supabase = createServerSupabaseAdminClient()
 
-    // Query base
+    // ========== QUERY OPTIMIZADA: Solo traer is_deleted y created_at ==========
     let query = supabase
       .from('posts')
       .select('is_deleted, created_at', { count: 'exact', head: false })
 
     // Aplicar filtros de fecha si existen
     if (dateFrom) {
-      // Inicio del día seleccionado (00:00:00)
       const dateFromStart = new Date(dateFrom)
       dateFromStart.setHours(0, 0, 0, 0)
       query = query.gte('created_at', dateFromStart.toISOString())
     }
     if (dateTo) {
-      // Final del día seleccionado (23:59:59.999)
       const dateToEnd = new Date(dateTo)
       dateToEnd.setHours(23, 59, 59, 999)
       query = query.lte('created_at', dateToEnd.toISOString())
@@ -47,7 +45,7 @@ export async function GET(request: Request) {
       throw error
     }
 
-    // Contar posts por estado
+    // Contar posts por estado de forma eficiente
     let activeCount = 0
     let deletedCount = 0
     

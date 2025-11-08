@@ -1,7 +1,7 @@
 // src/components/RevenueStatsCard.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import DateRangeFilter from './DateRangeFilter'
 import type { DashboardRevenueResponse } from '@/types/admin'
 
@@ -13,6 +13,7 @@ export default function RevenueStatsCard() {
   // Estados de filtros
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const hasFetchedInitialData = useRef(false)
 
   const fetchData = async (filters?: { dateFrom?: string; dateTo?: string }) => {
     try {
@@ -23,7 +24,8 @@ export default function RevenueStatsCard() {
       if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom)
       if (filters?.dateTo) params.append('dateTo', filters.dateTo)
 
-      const response = await fetch(`/api/admin/dashboard/revenue?${params.toString()}`)
+      const url = `/api/admin/dashboard/revenue${params.toString() ? '?' + params.toString() : ''}`
+      const response = await fetch(url)
       
       if (!response.ok) {
         throw new Error('Error al cargar datos de ingresos')
@@ -49,10 +51,13 @@ export default function RevenueStatsCard() {
     fetchData()
   }
 
-  // Cargar datos iniciales
-  useState(() => {
-    fetchData()
-  })
+  // Cargar datos iniciales solo una vez
+  useEffect(() => {
+    if (!hasFetchedInitialData.current) {
+      hasFetchedInitialData.current = true
+      fetchData()
+    }
+  }, [])
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {

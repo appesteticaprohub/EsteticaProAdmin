@@ -12,20 +12,18 @@ export async function GET(request: Request) {
 
     const supabase = createServerSupabaseAdminClient()
 
-    // Query base
+    // ========== QUERY OPTIMIZADA: Solo traer subscription_status ==========
     let query = supabase
       .from('profiles')
       .select('subscription_status', { count: 'exact', head: false })
 
     // Aplicar filtros de fecha si existen
     if (dateFrom) {
-      // Inicio del día seleccionado (00:00:00)
       const dateFromStart = new Date(dateFrom)
       dateFromStart.setHours(0, 0, 0, 0)
       query = query.gte('created_at', dateFromStart.toISOString())
     }
     if (dateTo) {
-      // Final del día seleccionado (23:59:59.999)
       const dateToEnd = new Date(dateTo)
       dateToEnd.setHours(23, 59, 59, 999)
       query = query.lte('created_at', dateToEnd.toISOString())
@@ -44,10 +42,11 @@ export async function GET(request: Request) {
       throw error
     }
 
-    // Contar usuarios por estado de suscripción
+    // Contar usuarios por estado de suscripción de forma eficiente
     const statusCounts: Record<string, number> = {}
     
     if (data) {
+      // Solo iteramos sobre el campo subscription_status, no sobre objetos completos
       data.forEach((profile: { subscription_status: string }) => {
         const status = profile.subscription_status || 'Unknown'
         statusCounts[status] = (statusCounts[status] || 0) + 1

@@ -1,7 +1,7 @@
 // src/components/UsersStatsCard.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import DateRangeFilter from './DateRangeFilter'
 import type { DashboardUsersResponse } from '@/types/admin'
 
@@ -24,6 +24,7 @@ export default function UsersStatsCard() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [subscriptionStatus, setSubscriptionStatus] = useState('all')
+  const hasFetchedInitialData = useRef(false)
 
   const fetchData = async (filters?: { dateFrom?: string; dateTo?: string; subscriptionStatus?: string }) => {
     try {
@@ -37,7 +38,8 @@ export default function UsersStatsCard() {
         params.append('subscriptionStatus', filters.subscriptionStatus)
       }
 
-      const response = await fetch(`/api/admin/dashboard/users?${params.toString()}`)
+      const url = `/api/admin/dashboard/users${params.toString() ? '?' + params.toString() : ''}`
+      const response = await fetch(url)
       
       if (!response.ok) {
         throw new Error('Error al cargar datos de usuarios')
@@ -68,10 +70,13 @@ export default function UsersStatsCard() {
     setSubscriptionStatus(status)
   }
 
-  // Cargar datos iniciales
-  useState(() => {
-    fetchData()
-  })
+  // Cargar datos iniciales solo una vez
+  useEffect(() => {
+    if (!hasFetchedInitialData.current) {
+      hasFetchedInitialData.current = true
+      fetchData()
+    }
+  }, [])
 
   // Función para obtener icono según el estado
   const getStatusIcon = (status: string): string => {

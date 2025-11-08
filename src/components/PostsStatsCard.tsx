@@ -1,7 +1,7 @@
 // src/components/PostsStatsCard.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import DateRangeFilter from './DateRangeFilter'
 import type { DashboardPostsResponse } from '@/types/admin'
 
@@ -14,6 +14,7 @@ export default function PostsStatsCard() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [postStatus, setPostStatus] = useState('all')
+  const hasFetchedInitialData = useRef(false)
 
   const fetchData = async (filters?: { dateFrom?: string; dateTo?: string; postStatus?: string }) => {
     try {
@@ -27,7 +28,8 @@ export default function PostsStatsCard() {
         params.append('postStatus', filters.postStatus)
       }
 
-      const response = await fetch(`/api/admin/dashboard/posts?${params.toString()}`)
+      const url = `/api/admin/dashboard/posts${params.toString() ? '?' + params.toString() : ''}`
+      const response = await fetch(url)
       
       if (!response.ok) {
         throw new Error('Error al cargar datos de posts')
@@ -58,10 +60,13 @@ export default function PostsStatsCard() {
     setPostStatus(status)
   }
 
-  // Cargar datos iniciales
-  useState(() => {
-    fetchData()
-  })
+  // Cargar datos iniciales solo una vez
+  useEffect(() => {
+    if (!hasFetchedInitialData.current) {
+      hasFetchedInitialData.current = true
+      fetchData()
+    }
+  }, [])
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
