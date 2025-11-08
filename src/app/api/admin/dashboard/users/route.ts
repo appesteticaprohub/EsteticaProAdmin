@@ -2,148 +2,76 @@
 
 import { NextResponse } from 'next/server'
 import { createServerSupabaseAdminClient } from '@/lib/server-supabase'
-import { getDateRanges, calculateGrowthPercentage } from '@/lib/dashboard-stats'
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const period = searchParams.get('period') || 'total'
+    const dateFrom = searchParams.get('dateFrom')
+    const dateTo = searchParams.get('dateTo')
+    const subscriptionStatus = searchParams.get('subscriptionStatus') || 'all'
 
     const supabase = createServerSupabaseAdminClient()
-    const dateRanges = getDateRanges()
 
-    let count = 0
-    let previousCount = 0
-    let label = ''
+    // Query base
+    let query = supabase
+      .from('profiles')
+      .select('subscription_status', { count: 'exact', head: false })
 
-    switch (period) {
-      case 'total':
-        // Total de usuarios
-        const { count: total } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true })
-        
-        count = total || 0
-        label = 'Total Usuarios'
-        break
-
-      case 'today':
-        // Usuarios nuevos hoy
-        const { count: today } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', dateRanges.today.start)
-          .lte('created_at', dateRanges.today.end)
-
-        // Usuarios de ayer para comparación
-        const yesterday = new Date(dateRanges.today.start)
-        yesterday.setDate(yesterday.getDate() - 1)
-        const yesterdayStart = yesterday.toISOString()
-        const yesterdayEnd = dateRanges.today.start
-
-        const { count: yesterdayCount } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', yesterdayStart)
-          .lt('created_at', yesterdayEnd)
-
-        count = today || 0
-        previousCount = yesterdayCount || 0
-        label = 'Nuevos Usuarios Hoy'
-        break
-
-      case 'week':
-        // Usuarios nuevos esta semana
-        const { count: thisWeek } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', dateRanges.thisWeek.start)
-          .lte('created_at', dateRanges.thisWeek.end)
-
-        // Semana anterior para comparación
-        const lastWeekStart = new Date(dateRanges.thisWeek.start)
-        lastWeekStart.setDate(lastWeekStart.getDate() - 7)
-        const lastWeekEnd = dateRanges.thisWeek.start
-
-        const { count: lastWeek } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', lastWeekStart.toISOString())
-          .lt('created_at', lastWeekEnd)
-
-        count = thisWeek || 0
-        previousCount = lastWeek || 0
-        label = 'Nuevos Usuarios (Semana)'
-        break
-
-      case 'month':
-        // Usuarios nuevos este mes
-        const { count: thisMonth } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', dateRanges.thisMonth.start)
-          .lte('created_at', dateRanges.thisMonth.end)
-
-        // Mes anterior para comparación
-        const { count: lastMonth } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', dateRanges.lastMonth.start)
-          .lt('created_at', dateRanges.lastMonth.end)
-
-        count = thisMonth || 0
-        previousCount = lastMonth || 0
-        label = 'Nuevos Usuarios (Mes)'
-        break
-
-      case 'year':
-        // Usuarios nuevos este año
-        const { count: thisYear } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', dateRanges.thisYear.start)
-          .lte('created_at', dateRanges.thisYear.end)
-
-        // Año anterior para comparación
-        const lastYearStart = new Date(dateRanges.thisYear.start)
-        lastYearStart.setFullYear(lastYearStart.getFullYear() - 1)
-        const lastYearEnd = dateRanges.thisYear.start
-
-        const { count: lastYear } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', lastYearStart.toISOString())
-          .lt('created_at', lastYearEnd)
-
-        count = thisYear || 0
-        previousCount = lastYear || 0
-        label = 'Nuevos Usuarios (Año)'
-        break
-
-      default:
-        return NextResponse.json(
-          { error: 'Período inválido' },
-          { status: 400 }
-        )
+    // Aplicar filtros de fecha si existen
+    if (dateFrom) {
+      // Inicio del día seleccionado (00:00:00)
+      const dateFromStart = new Date(dateFrom)
+      dateFromStart.setHours(0, 0, 0, 0)
+      query = query.gte('created_at', dateFromStart.toISOString())
+    }
+    if (dateTo) {
+      // Final del día seleccionado (23:59:59.999)
+      const dateToEnd = new Date(dateTo)
+      dateToEnd.setHours(23, 59, 59, 999)
+      query = query.lte('created_at', dateToEnd.toISOString())
     }
 
-    // Calcular porcentaje de crecimiento
-    const growthPercentage = period === 'total' 
-      ? 0 
-      : calculateGrowthPercentage(count, previousCount)
+    // Aplicar filtro de estado de suscripción si no es "all"
+    if (subscriptionStatus !== 'all') {
+      query = query.eq('subscription_status', subscriptionStatus)
+    }
+
+    // Ejecutar query
+    const { data, count, error } = await query
+
+    if (error) {
+      console.error('Error fetching users:', error)
+      throw error
+    }
+
+    // Contar usuarios por estado de suscripción
+    const statusCounts: Record<string, number> = {}
+    
+    if (data) {
+      data.forEach((profile: { subscription_status: string }) => {
+        const status = profile.subscription_status || 'Unknown'
+        statusCounts[status] = (statusCounts[status] || 0) + 1
+      })
+    }
 
     return NextResponse.json({
-      count,
-      previousCount,
-      growthPercentage,
-      label,
-      period
+      success: true,
+      total: count || 0,
+      statusBreakdown: statusCounts,
+      filters: {
+        dateFrom,
+        dateTo,
+        subscriptionStatus
+      }
     })
 
   } catch (error) {
-    console.error('Error fetching users stats:', error)
+    console.error('Error in users dashboard endpoint:', error)
     return NextResponse.json(
-      { error: 'Error al obtener estadísticas de usuarios' },
+      { 
+        success: false,
+        error: 'Error al obtener estadísticas de usuarios' 
+      },
       { status: 500 }
     )
   }

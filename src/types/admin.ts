@@ -653,3 +653,62 @@ export interface PayPalBatchUpdateResponse {
   errors?: PayPalError[]
 }
 
+// ============================================
+// TIPOS PARA DASHBOARD CON FILTROS
+// ============================================
+
+export interface DashboardUsersResponse {
+  success: boolean
+  total: number
+  statusBreakdown: Record<string, number>
+  filters: {
+    dateFrom: string | null
+    dateTo: string | null
+    subscriptionStatus: string
+  }
+}
+
+export interface DashboardPostsResponse {
+  success: boolean
+  total: number
+  statusBreakdown: {
+    active: number
+    deleted: number
+  }
+  averagePerDay: number
+  filters: {
+    dateFrom: string | null
+    dateTo: string | null
+    postStatus: string
+  }
+}
+
+export interface DashboardRevenueResponse {
+  success: boolean
+  totalRevenue: number
+  paymentCount: number
+  averagePerPayment: number
+  filters: {
+    dateFrom: string | null
+    dateTo: string | null
+  }
+}
+
+export interface DashboardFilters {
+  dateFrom: string
+  dateTo: string
+}
+
+export interface UserFilters extends DashboardFilters {
+  subscriptionStatus: 'all' | 'Active' | 'Inactive' | 'Expired' | string
+}
+
+export interface PostFilters extends DashboardFilters {
+  postStatus: 'all' | 'active' | 'deleted'
+}
+
+export interface RevenueFilters {
+  dateFrom: string
+  dateTo: string
+}
+
