@@ -1,7 +1,7 @@
 // src/app/api/admin/paypal/update-batch/route.ts
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/server-supabase';
-import { updatePayPalSubscriptionPrice } from '@/lib/paypal';
+import { cancelActiveSubscriptionsForPriceChange } from '@/lib/paypal';
 
 export async function POST(request: Request) {
   try {
@@ -33,12 +33,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Obtener el bloque de suscripciones activas con paypal_subscription_id
-    // Incluye: Active, Payment_Failed y Grace_Period
+    // NUEVA ESTRATEGIA: Solo obtener usuarios Active para cancelar
+    // Payment_Failed y Grace_Period mantendrán sus suscripciones PayPal
     const { data: subscriptions, error: subsError, count } = await supabase
       .from('profiles')
       .select('id, email, paypal_subscription_id', { count: 'exact' })
-      .in('subscription_status', ['Active', 'Payment_Failed', 'Grace_Period'])
+      .eq('subscription_status', 'Active')  // Solo usuarios Active
       .not('paypal_subscription_id', 'is', null)
       .eq('is_banned', false)
       .range(offset, offset + batchSize - 1);
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
 
     if (!subscriptions || subscriptions.length === 0) {
       return NextResponse.json({
-        message: 'No hay más suscripciones para actualizar',
+        message: 'No hay más suscripciones Active para cancelar',
         updated: 0,
         failed: 0,
         total: count || 0,
@@ -62,48 +62,10 @@ export async function POST(request: Request) {
       });
     }
 
-    // Actualizar suscripciones en PayPal una por una
-    const results = {
-      updated: 0,
-      failed: 0,
-      errors: [] as Array<{ email: string; paypal_id: string; error: string }>
-    };
-
-    for (const subscription of subscriptions) {
-      try {
-        console.log(`🔄 Actualizando PayPal: ${subscription.email}`);
-        
-        const result = await updatePayPalSubscriptionPrice(
-          subscription.paypal_subscription_id!,
-          newPrice
-        );
-
-        if (result.ok) {
-          results.updated++;
-          console.log(`✅ Actualizado: ${subscription.email}`);
-        } else {
-          results.failed++;
-          results.errors.push({
-            email: subscription.email,
-            paypal_id: subscription.paypal_subscription_id!,
-            error: typeof result.error === 'string' ? result.error : JSON.stringify(result.error)
-          });
-          console.log(`❌ Error: ${subscription.email}`);
-        }
-
-      } catch (error) {
-        results.failed++;
-        results.errors.push({
-          email: subscription.email,
-          paypal_id: subscription.paypal_subscription_id!,
-          error: error instanceof Error ? error.message : 'Error desconocido'
-        });
-        console.error(`❌ Excepción: ${subscription.email}`, error);
-      }
-
-      // Pausa de 1 segundo entre llamadas a PayPal
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
+    // NUEVA ESTRATEGIA: Cancelar suscripciones Active en PayPal
+    console.log(`🔄 Cancelando ${subscriptions.length} suscripciones Active en PayPal...`);
+    
+    const results = await cancelActiveSubscriptionsForPriceChange(subscriptions);
 
     const totalSubscriptions = count || 0;
     const processedSoFar = offset + subscriptions.length;
@@ -111,8 +73,8 @@ export async function POST(request: Request) {
     const nextOffset = hasMore ? offset + batchSize : offset;
 
     return NextResponse.json({
-      message: `Bloque procesado: ${results.updated} actualizadas, ${results.failed} fallidas`,
-      updated: results.updated,
+      message: `Bloque procesado: ${results.cancelled} canceladas, ${results.failed} fallidas`,
+      updated: results.cancelled,  // Para mantener compatibilidad con frontend
       failed: results.failed,
       errors: results.errors,
       processedSoFar,

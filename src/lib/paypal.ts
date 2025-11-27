@@ -210,3 +210,50 @@ export async function cancelPayPalSubscription(subscriptionId: string, reason: s
     };
   }
 }
+
+// Cancelar múltiples suscripciones activas para cambio de precio
+export async function cancelActiveSubscriptionsForPriceChange(subscriptions: Array<{id: string, paypal_subscription_id: string, email: string}>) {
+  const results = {
+    cancelled: 0,
+    failed: 0,
+    errors: [] as Array<{ email: string; paypal_id: string; error: string }>
+  };
+  
+  for (const subscription of subscriptions) {
+    try {
+      console.log(`🔄 Cancelando PayPal para cambio de precio: ${subscription.email}`);
+      
+      const result = await cancelPayPalSubscription(
+        subscription.paypal_subscription_id, 
+        "Subscription cancelled due to price change - user will maintain access until expiration"
+      );
+      
+      if (result.success) {
+        results.cancelled++;
+        console.log(`✅ Cancelado: ${subscription.email}`);
+      } else {
+        results.failed++;
+        results.errors.push({
+          email: subscription.email,
+          paypal_id: subscription.paypal_subscription_id,
+          error: typeof result.error === 'string' ? result.error : JSON.stringify(result.error)
+        });
+        console.log(`❌ Error cancelando: ${subscription.email}`);
+      }
+
+    } catch (error) {
+      results.failed++;
+      results.errors.push({
+        email: subscription.email,
+        paypal_id: subscription.paypal_subscription_id,
+        error: error instanceof Error ? error.message : 'Error desconocido'
+      });
+      console.error(`❌ Excepción cancelando: ${subscription.email}`, error);
+    }
+    
+    // Pausa de 1 segundo entre llamadas a PayPal para respetar rate limits
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  
+  return results;
+}
