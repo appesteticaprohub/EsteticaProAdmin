@@ -62,6 +62,25 @@ export async function POST(request: Request) {
       });
     }
 
+    // 🆕 ACTIVAR FLAG DE CAMBIO DE PRECIO ANTES DE CANCELAR
+    console.log(`🏷️ Activando flag price_change_in_progress para ${subscriptions.length} usuarios...`);
+    
+    const userIds = subscriptions.map(sub => sub.id);
+    const { error: flagError } = await supabase
+      .from('profiles')
+      .update({ price_change_in_progress: true })
+      .in('id', userIds);
+    
+    if (flagError) {
+      console.error('Error activando flag price_change_in_progress:', flagError);
+      return NextResponse.json(
+        { error: 'Error preparando usuarios para cambio de precio' },
+        { status: 500 }
+      );
+    }
+    
+    console.log(`✅ Flag activado para ${subscriptions.length} usuarios`);
+
     // NUEVA ESTRATEGIA: Cancelar suscripciones Active en PayPal
     console.log(`🔄 Cancelando ${subscriptions.length} suscripciones Active en PayPal...`);
     
