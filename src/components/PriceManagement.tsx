@@ -268,6 +268,12 @@ export default function PriceManagement() {
       return;
     }
 
+    // 🆕 VALIDAR QUE SE HAYAN ENVIADO LAS NOTIFICACIONES PRIMERO
+    if (sentCount === 0) {
+      alert('⚠️ Primero debes enviar las notificaciones de cambio de precio antes de cancelar PayPal');
+      return;
+    }
+
     // Solo confirmar al inicio
     if (paypalCurrentOffset === 0) {
       const confirmUpdate = confirm(
@@ -468,111 +474,6 @@ export default function PriceManagement() {
           </button>
         </div>
       </div>
-
-      {/* Panel de actualización de PayPal por bloques */}
-      {priceUpdated && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">
-            💳 Actualizar Suscripciones PayPal por Bloques
-          </h3>
-
-          <div className="space-y-4">
-            {/* Información y configuración */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-purple-50 p-3 rounded-lg">
-                <p className="text-xs text-gray-600 mb-1">Suscripciones Activas</p>
-                <p className="text-xl font-bold text-purple-600">
-                  {totalPaypalSubscriptions}
-                </p>
-              </div>
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <label className="text-xs text-gray-600 block mb-1">
-                  Tamaño de Bloque
-                </label>
-                <select
-                  value={paypalBatchSize}
-                  onChange={(e) => setPaypalBatchSize(Number(e.target.value))}
-                  disabled={isUpdatingPaypal || paypalUpdatedCount > 0}
-                  className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value={5}>5 (prueba - ~0.5 min)</option>
-                  <option value={50}>50 (~1 min)</option>
-                  <option value={100}>100 (~2 min)</option>
-                  <option value={200}>200 (~4 min)</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Barra de progreso PayPal */}
-            {paypalUpdatedCount > 0 && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs text-gray-600">
-                  <span className="font-medium">Progreso de Actualización PayPal</span>
-                  <span className="font-bold">
-                    {paypalUpdatedCount} / {totalPaypalSubscriptions}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                  <div
-                    className="bg-purple-500 h-full transition-all duration-300 flex items-center justify-center text-[10px] text-white font-bold"
-                    style={{ width: `${Math.min((paypalUpdatedCount / (totalPaypalSubscriptions || 1)) * 100, 100)}%` }}
-                  >
-                    {Math.round((paypalUpdatedCount / (totalPaypalSubscriptions || 1)) * 100)}%
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-green-50 p-2 rounded text-center">
-                    <span className="text-green-600 font-medium">✅ Actualizadas: {paypalUpdatedCount}</span>
-                  </div>
-                  {paypalFailedCount > 0 && (
-                    <div className="bg-red-50 p-2 rounded text-center">
-                      <span className="text-red-600 font-medium">❌ Fallidas: {paypalFailedCount}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Info importante */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-sm text-blue-800 mb-2">
-                ℹ️ <strong>Importante:</strong> Cada bloque toma ~1 segundo por suscripción debido al rate limit de PayPal. 
-                Un bloque de 100 tomará aproximadamente 2 minutos.
-              </p>
-              <p className="text-xs text-blue-700">
-                💡 <strong>Se incluyen:</strong> Active, Payment_Failed y Grace_Period (usuarios con suscripciones activas en PayPal)
-              </p>
-            </div>
-
-            {/* Botones de acción PayPal */}
-            <div className="space-y-2">
-              <button
-                onClick={updatePayPalBatch}
-                disabled={isUpdatingPaypal || !hasMorePaypalToUpdate}
-                className="w-full px-4 py-3 text-sm font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-              >
-                {isUpdatingPaypal 
-                  ? '⏳ Actualizando PayPal...' 
-                  : !hasMorePaypalToUpdate 
-                    ? '✅ Actualización PayPal Completada' 
-                    : paypalUpdatedCount > 0 
-                      ? `💳 Actualizar Siguiente Bloque (${Math.min(paypalBatchSize, totalPaypalSubscriptions - paypalCurrentOffset)} suscripciones)` 
-                      : '🚀 Iniciar Actualización PayPal'}
-              </button>
-
-              {!hasMorePaypalToUpdate && paypalUpdatedCount > 0 && (
-                <button
-                  onClick={resetPayPalUpdate}
-                  className="w-full px-4 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-                >
-                  🔄 Resetear Actualización PayPal
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Panel de envío por bloques */}
       {priceUpdated && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -673,6 +574,118 @@ export default function PriceManagement() {
                   className="w-full px-4 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
                 >
                   🔄 Preparar Nuevo Cambio de Precio
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+        
+      )}
+      {/* Panel de actualización de PayPal por bloques */}
+      {priceUpdated && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h3 className="text-xl font-bold text-gray-900 mb-4">
+            💳 Actualizar Suscripciones PayPal por Bloques
+          </h3>
+
+          <div className="space-y-4">
+            {/* Información y configuración */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-purple-50 p-3 rounded-lg">
+                <p className="text-xs text-gray-600 mb-1">Suscripciones Activas</p>
+                <p className="text-xl font-bold text-purple-600">
+                  {totalPaypalSubscriptions}
+                </p>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <label className="text-xs text-gray-600 block mb-1">
+                  Tamaño de Bloque
+                </label>
+                <select
+                  value={paypalBatchSize}
+                  onChange={(e) => setPaypalBatchSize(Number(e.target.value))}
+                  disabled={isUpdatingPaypal || paypalUpdatedCount > 0}
+                  className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value={5}>5 (prueba - ~0.5 min)</option>
+                  <option value={50}>50 (~1 min)</option>
+                  <option value={100}>100 (~2 min)</option>
+                  <option value={200}>200 (~4 min)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Barra de progreso PayPal */}
+            {paypalUpdatedCount > 0 && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs text-gray-600">
+                  <span className="font-medium">Progreso de Actualización PayPal</span>
+                  <span className="font-bold">
+                    {paypalUpdatedCount} / {totalPaypalSubscriptions}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                  <div
+                    className="bg-purple-500 h-full transition-all duration-300 flex items-center justify-center text-[10px] text-white font-bold"
+                    style={{ width: `${Math.min((paypalUpdatedCount / (totalPaypalSubscriptions || 1)) * 100, 100)}%` }}
+                  >
+                    {Math.round((paypalUpdatedCount / (totalPaypalSubscriptions || 1)) * 100)}%
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-green-50 p-2 rounded text-center">
+                    <span className="text-green-600 font-medium">✅ Actualizadas: {paypalUpdatedCount}</span>
+                  </div>
+                  {paypalFailedCount > 0 && (
+                    <div className="bg-red-50 p-2 rounded text-center">
+                      <span className="text-red-600 font-medium">❌ Fallidas: {paypalFailedCount}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Info importante */}
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+              <p className="text-sm text-red-800 mb-2">
+                🚨 <strong>Orden Correcto:</strong> Primero envía las notificaciones de cambio de precio, DESPUÉS cancela PayPal.
+              </p>
+              <p className="text-xs text-red-700">
+                Esto evita que los usuarios reciban notificaciones incorrectas de cancelación.
+              </p>
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-blue-800 mb-2">
+                ℹ️ <strong>Importante:</strong> Cada bloque toma ~1 segundo por suscripción debido al rate limit de PayPal. 
+                Un bloque de 100 tomará aproximadamente 2 minutos.
+              </p>
+              <p className="text-xs text-blue-700">
+                💡 <strong>Se incluyen:</strong> Active, Payment_Failed y Grace_Period (usuarios con suscripciones activas en PayPal)
+              </p>
+            </div>
+
+            {/* Botones de acción PayPal */}
+            <div className="space-y-2">
+              <button
+                onClick={updatePayPalBatch}
+                disabled={isUpdatingPaypal || !hasMorePaypalToUpdate}
+                className="w-full px-4 py-3 text-sm font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              >
+                {isUpdatingPaypal 
+                  ? '⏳ Actualizando PayPal...' 
+                  : !hasMorePaypalToUpdate 
+                    ? '✅ Actualización PayPal Completada' 
+                    : paypalUpdatedCount > 0 
+                      ? `💳 Actualizar Siguiente Bloque (${Math.min(paypalBatchSize, totalPaypalSubscriptions - paypalCurrentOffset)} suscripciones)` 
+                      : '🚀 Iniciar Actualización PayPal'}
+              </button>
+
+              {!hasMorePaypalToUpdate && paypalUpdatedCount > 0 && (
+                <button
+                  onClick={resetPayPalUpdate}
+                  className="w-full px-4 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                >
+                  🔄 Resetear Actualización PayPal
                 </button>
               )}
             </div>
