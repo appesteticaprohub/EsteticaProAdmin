@@ -12,7 +12,8 @@ const VALID_SUBSCRIPTION_STATES = [
   'Suspended',
   'Expired',
   'Payment_Failed',
-  'Grace_Period'
+  'Grace_Period',
+  'Price_Change_Cancelled'
 ] as const
 
 export default function UsersStatsCard() {
@@ -86,7 +87,8 @@ export default function UsersStatsCard() {
       'Suspended': '⏸️',
       'Expired': '❌',
       'Payment_Failed': '⚠️',
-      'Grace_Period': '⏳'
+      'Grace_Period': '⏳',
+      'Price_Change_Cancelled': '💰'
     }
     return icons[status] || '❓'
   }
@@ -140,6 +142,7 @@ const getFilteredBreakdown = (breakdown: Record<string, number>) => {
             <option value="Expired">Expired</option>
             <option value="Payment_Failed">Payment_Failed</option>
             <option value="Grace_Period">Grace_Period</option>
+            <option value="Price_Change_Cancelled">Price_Change_Cancelled</option>
           </select>
         </div>
       </div>

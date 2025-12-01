@@ -82,6 +82,11 @@ export default function ImageSettingsPanel() {
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Configuración de Imágenes</h2>
         <p className="text-gray-600 mt-1">Gestiona los límites y restricciones para la subida de imágenes</p>
+        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800">
+            <span className="font-medium">💡 Nota:</span> Los cambios en la configuración de imágenes se reflejan en la aplicación de usuarios en un plazo máximo de 24 horas.
+          </p>
+        </div>
       </div>
 
       {message && (

@@ -248,6 +248,10 @@ const handleSearchEmailChange = (value: string) => {
       Expired: 'bg-red-100 text-red-800',
       Cancelled: 'bg-yellow-100 text-yellow-800',
       Pending: 'bg-gray-100 text-gray-800',
+      Payment_Failed: 'bg-orange-100 text-orange-800',
+      Grace_Period: 'bg-yellow-100 text-yellow-800',
+      Suspended: 'bg-red-100 text-red-800',
+      Price_Change_Cancelled: 'bg-purple-100 text-purple-800',
     }
     return (
       <span className={`px-2 py-1 text-xs font-medium rounded-full ${styles[status] || 'bg-gray-100 text-gray-800'}`}>
