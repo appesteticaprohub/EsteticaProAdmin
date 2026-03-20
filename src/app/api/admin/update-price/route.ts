@@ -48,6 +48,18 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
+    // Limpiar PAYPAL_PLAN_ID para forzar creación de nuevo plan con precio actualizado
+const { error: planResetError } = await supabase
+  .from('app_settings')
+  .update({ value: '' })
+  .eq('key', 'PAYPAL_PLAN_ID');
+
+if (planResetError) {
+  console.error('Error limpiando PAYPAL_PLAN_ID:', planResetError);
+} else {
+  console.log('✅ PAYPAL_PLAN_ID limpiado correctamente para nuevo precio:', newPrice);
+}
+
     // Las suscripciones de PayPal se actualizarán manualmente por bloques
     // usando el endpoint /api/admin/paypal/update-batch
 
