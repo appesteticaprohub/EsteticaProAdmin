@@ -89,7 +89,7 @@ if (planResetError) {
     console.error('Error in update-price API:', error);
     return NextResponse.json({
       success: false,
-      message: 'Error interno del servidor'
+      message: 'Error interno del servidor.'
     }, { status: 500 });
   }
 }
