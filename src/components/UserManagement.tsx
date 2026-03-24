@@ -40,7 +40,8 @@ const [searchEmailInput, setSearchEmailInput] = useState('')
 // Estados de búsqueda con debounce (lo que realmente se envía al servidor)
 const debouncedSearchName = useDebounce(searchNameInput, 500)
 const debouncedSearchEmail = useDebounce(searchEmailInput, 500)
-  const [filters, setFilters] = useState<UsersFilters>({})
+const [filters, setFilters] = useState<UsersFilters>({})
+const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState('')
 
   // Estado del modal
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null)
@@ -55,7 +56,6 @@ const cacheRef = useRef<Map<string, {
   timestamp: number
 }>>(new Map())
 
-// Generar clave única para el caché basada en los parámetros de búsqueda
 const getCacheKey = useCallback(() => {
   const filterEntries = Object.entries(filters)
     .filter((entry): entry is [string, string] => {
@@ -70,10 +70,11 @@ const getCacheKey = useCallback(() => {
     limit,
     searchName: debouncedSearchName.trim(),
     searchEmail: debouncedSearchEmail.trim(),
+    subscriptionStatus: subscriptionStatusFilter,
     filters: filterEntries
   }
   return JSON.stringify(params)
-}, [currentPage, limit, debouncedSearchName, debouncedSearchEmail, filters])
+}, [currentPage, limit, debouncedSearchName, debouncedSearchEmail, subscriptionStatusFilter, filters])
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -111,6 +112,7 @@ const getCacheKey = useCallback(() => {
 
       if (debouncedSearchName.trim()) params.append('search_name', debouncedSearchName.trim())
       if (debouncedSearchEmail.trim()) params.append('search_email', debouncedSearchEmail.trim())
+      if (subscriptionStatusFilter) params.append('subscription_status', subscriptionStatusFilter)
 
       // Agregar filtros adicionales si existen
       Object.entries(filters).forEach(([key, value]) => {
@@ -203,6 +205,7 @@ const handleSearchEmailChange = (value: string) => {
   const handleClearFilters = () => {
   setSearchNameInput('')
   setSearchEmailInput('')
+  setSubscriptionStatusFilter('')
   setFilters({})
   setCurrentPage(1)
 }
@@ -358,6 +361,30 @@ const handleSearchEmailChange = (value: string) => {
           </div>
           </div>
 
+          {/* Filtro por estado de suscripción */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Estado de suscripción
+            </label>
+            <select
+              value={subscriptionStatusFilter}
+              onChange={(e) => {
+                setSubscriptionStatusFilter(e.target.value)
+                setCurrentPage(1)
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todos</option>
+              <option value="Active">Active</option>
+              <option value="Expired">Expired</option>
+              <option value="Cancelled">Cancelled</option>
+              <option value="Payment_Failed">Payment Failed</option>
+              <option value="Grace_Period">Grace Period</option>
+              <option value="Suspended">Suspended</option>
+              <option value="Price_Change_Cancelled">Price Change Cancelled</option>
+            </select>
+          </div>
+
           {/* Botón limpiar filtros */}
           <div className="flex items-end">
             <button
@@ -416,12 +443,23 @@ const handleSearchEmailChange = (value: string) => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{user.email}</div>
-                      <div className="text-sm text-gray-500">
-                        {user.is_banned ? (
-                          <span className="text-red-600 font-medium">🚫 Baneado</span>
-                        ) : (
-                          <span className="text-green-600 font-medium">✓ Activo</span>
-                        )}
+                      <div className="mt-1 space-y-1">
+                        <div className="text-xs text-gray-500">
+                          <span className="font-medium text-gray-600">Baneo: </span>
+                          {user.is_banned ? (
+                            <span className="text-red-600 font-medium">🚫 Baneado</span>
+                          ) : (
+                            <span className="text-green-600 font-medium">✓ Activo</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          <span className="font-medium text-gray-600">Suscripción: </span>
+                          {getStatusBadge(user.subscription_status)}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          <span className="font-medium text-gray-600">Vencimiento: </span>
+                          <span>{formatDateBogota(user.subscription_expires_at)}</span>
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
