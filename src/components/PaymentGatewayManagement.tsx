@@ -282,13 +282,13 @@ export default function PaymentGatewayManagement() {
             {isAutoRenewalEnabled ? (
               <ul className="list-disc list-inside space-y-1">
                 <li>Los usuarios verán &quot;Suscripción mensual automática&quot;</li>
-                <li>Se crearán suscripciones recurrentes en PayPal</li>
+                <li>Se crearán suscripciones recurrentes en ePayco</li>
                 <li>Los pagos se renovarán automáticamente cada mes</li>
               </ul>
             ) : (
               <ul className="list-disc list-inside space-y-1">
                 <li>Los usuarios verán &quot;Pago único - Acceso por 1 mes&quot;</li>
-                <li>Se crearán pagos únicos en PayPal</li>
+                <li>Se procesarán pagos únicos vía ePayco</li>
                 <li>Los usuarios deberán pagar manualmente cada mes</li>
               </ul>
             )}
