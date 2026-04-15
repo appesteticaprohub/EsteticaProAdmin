@@ -15,7 +15,6 @@ export async function POST(
     const body: DeleteCommentRequest = await request.json()
     const { reason } = body
 
-    // Obtener admin_id de la sesión autenticada
     const supabaseAuth = await createServerSupabaseClient()
     const { data: { user: adminUser }, error: authError } = await supabaseAuth.auth.getUser()
 
@@ -26,7 +25,6 @@ export async function POST(
       )
     }
 
-    // Verificar que el usuario autenticado es admin
     const { data: adminProfile, error: adminError } = await supabaseAuth
       .from('profiles')
       .select('role')
@@ -51,7 +49,6 @@ export async function POST(
 
     const supabase = createServerSupabaseAdminClient()
 
-    // 1. Verificar que el comentario existe
     const { data: comment, error: commentError } = await supabase
       .from('comments')
       .select('id, content, user_id, post_id, is_deleted')
@@ -65,7 +62,6 @@ export async function POST(
       )
     }
 
-    // 2. Verificar si ya está eliminado
     if (comment.is_deleted) {
       return NextResponse.json(
         { success: false, error: 'Comment is already deleted' },
@@ -73,7 +69,7 @@ export async function POST(
       )
     }
 
-    // 3. Soft delete del comentario
+    // Soft delete: marcar como eliminado (sin tocar comments_count)
     const { error: deleteError } = await supabase
       .from('comments')
       .update({
@@ -90,17 +86,7 @@ export async function POST(
       )
     }
 
-    // 4. Decrementar contador de comentarios en el post
-    const { error: decrementError } = await supabase.rpc('decrement_comment_count', {
-      post_id_param: comment.post_id
-    })
-
-    if (decrementError) {
-      console.error('Error decrementing comment count:', decrementError)
-      // No retornamos error, el comentario ya se eliminó
-    }
-
-    // 5. Registrar acción en moderation_logs
+    // Registrar acción en moderation_logs
     const { error: logError } = await supabase
       .from('moderation_logs')
       .insert({
@@ -120,8 +106,6 @@ export async function POST(
     if (logError) {
       console.error('Error creating moderation log:', logError)
     }
-
-    console.log(`Comment deleted successfully: ${commentId}`)
 
     return NextResponse.json({
       success: true,
