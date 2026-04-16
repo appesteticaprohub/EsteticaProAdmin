@@ -253,7 +253,7 @@ async function sendNewsletterToRecipients(recipients: RecipientData[], posts: Po
 
       // Reemplazar variables manualmente (sin función externa)
       const userName = recipient.full_name || recipient.email?.split('@')[0] || 'Usuario'
-      const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '')}/perfil`
+      const unsubscribeUrl = `${process.env.USERS_APP_URL?.replace(/\/$/, '')}/perfil`
 
       finalHtml = finalHtml
         .replace(/{{nombre}}/g, userName)
@@ -331,7 +331,7 @@ async function sendNewsletterToRecipients(recipients: RecipientData[], posts: Po
 
 // Función para generar HTML de posts para newsletter
 function generatePostsHtml(posts: PostWithProfile[]): string {
-  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://esteticaprohub.com').replace(/\/$/, '')
+  const baseUrl = (process.env.USERS_APP_URL || 'https://esteticaprohub.com').replace(/\/$/, '')
 
   return posts.map((post) => {
     const profile = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles
